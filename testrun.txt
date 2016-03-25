@@ -1,0 +1,34 @@
+#####################################################################
+# acisfp_check.py run at Thu May 16 12:14:57 2013 by gregg
+# acisfp_check version = 0.2
+# model_spec file = /data/acis/LoadReviews/script/fp_temp_predictor/acisfp_spec.json
+#####################################################################
+
+Command line options:
+{'T_acisfp': None,
+ 'ccd_count': 6,
+ 'clocking': 1,
+ 'days': 21.0,
+ 'fep_count': 6,
+ 'model_spec': 'acisfp_spec.json',
+ 'oflsdir': '/data/acis/LoadReviews/2013/APR2513/ofls',
+ 'outdir': '/home/gregg/Desktop',
+ 'pitch': 150.0,
+ 'run_start': None,
+ 'simpos': 75616,
+ 'traceback': True,
+ 'verbose': 2,
+ 'version': None,
+ 'vid_board': 1}
+
+Connecting to SKA DBI database to get cmd_states
+
+Obtaining the commands from the prediction load backstop file
+   log - Using backstop file /data/acis/LoadReviews/2013/APR2513/ofls/CR115_0104.backstop
+   log - Found 616 backstop commands between 2013:115:02:04:02.099 and 2013:119:00:10:02.417
+Traceback (most recent call last):
+  File "acisfp_check.py", line 1791, in <module>
+    main(opt)
+  File "acisfp_check.py", line 243, in main
+    logger.info('   BACSTOP FILE TSTART is: %s' % Chandra.Time.DateTime(tstart).date)
+NameError: global name 'Chandra' is not defined
