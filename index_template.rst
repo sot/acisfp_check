@@ -42,7 +42,7 @@ No -114 deg C FP_TEMP Violations
 
 
 {% if fp_sens_viols.fptemp  %}
-FP_TEMP -118.7 deg C Violations for FP TEMP Sensitive Observations
+FP TEMP Sensitive, -118.7 deg. C Preference Not Met:
 -------------------------------------------------------------------
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     OBSID
