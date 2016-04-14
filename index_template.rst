@@ -16,7 +16,7 @@ Summary
 ====================  =============================================
 Date start            {{proc.datestart}}
 Date stop             {{proc.datestop}}
-FP_TEMP status        {%if red_viols.fptemp or fp_sens_viols.fptemp%}:red:`NOT OK`{% else %}OK{% endif%} 
+FP_TEMP status        {%if red_viols.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
 {% if opt.loaddir %}
 Load directory        {{opt.loaddir}}
 {% endif %}
