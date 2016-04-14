@@ -1063,7 +1063,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
              - science_viols
 
         2) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7 
-           is a violation, and a load killer
+           results in a "Preferences Not Met" indicator.
              - fp_sense_viols
 
         3) Any CTI run that violates the -114 RED limit needs to be
@@ -1107,7 +1107,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         #------------------------------------
         #  CTI-ONLY, -118.7 violation check
         #------------------------------------
-        logger.info('\n\nCTI ONLY -118.7 violations')
+        logger.info('\n\nCTI ONLY -118.7 FP SENSE violations')
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
