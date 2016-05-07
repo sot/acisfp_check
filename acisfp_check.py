@@ -51,7 +51,7 @@ import ACISobs
 MSID = dict(fptemp = 'FPTEMP')
 
 YELLOW = dict(fptemp = -50.0)
-RED = dict(fptemp = -114.0)
+
 MARGIN = dict(fptemp = 2.5)
 
 # This is the cutoff temperature for any FPTEMP sensitive observation
@@ -59,6 +59,13 @@ MARGIN = dict(fptemp = 2.5)
 # the focal plane temperature, it has to be flagged
 FP_TEMP_SENSITIVE = dict(fptemp = -118.7)
 FP_TEMP_MINIMUM = dict(fptemp = -118.7)
+
+# This is the new maximum temperature for all ACIS-S observations (4/26/16)
+ACIS_S_RED = dict(fptemp = -112.0)
+
+# ACIS-I max temperatures remain at -114 deg. C
+ACIS_I_RED = dict(fptemp = -114.0)
+ACIS_I_RED = dict(fptemp = -115.0)
 
 
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0),
@@ -291,7 +298,7 @@ def main(opt):
     if opt.oflsdir is not None:
         pred = make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db)
     else:
-        pred = dict(plots=None, red_viols=None, cti_viols=None, fp_sens_viols=None, times=None, states=None, temps=None)
+        pred = dict(plots=None, ACIS_I_viols=None, ACIS_S_viols=None, cti_viols=None, fp_sens_viols=None, times=None, states=None, temps=None)
 
     #----------------------
     # MAKE_VALIDATION_PLOTS
@@ -322,7 +329,8 @@ def main(opt):
                     plots_validation, 
                     valid_viols=valid_viols,
                     plots=pred['plots'], 
-                    red_viols=pred['red_viols'], 
+                    ACIS_I_viols=pred['ACIS_I_viols'], 
+                    ACIS_S_viols=pred['ACIS_S_viols'], 
                     fp_sens_viols=pred['fp_sens_viols'],
                     cti_viols = pred['cti_viols'])
 
@@ -331,7 +339,8 @@ def main(opt):
     print "ALL DONE!"
     return dict(opt=opt, states=pred['states'], times=pred['times'],
                 temps=pred['temps'], plots=pred['plots'],
-                red_viols=pred['red_viols'], 
+                ACIS_I_viols=pred['ACIS_I_viols'], 
+                ACIS_S_viols=pred['ACIS_S_viols'], 
                 cti_viols=pred['cti_viols'], 
                 fp_sens_viols=pred['fp_sens_viols'], 
 
@@ -578,6 +587,7 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
 
     # Get the commanded states from state0 through the end of backstop commands
     states = cmd_states.get_states(state0, db_cmds + bs_cmds)
+
     states[-1].datestop = bs_cmds[-1]['date']
     states[-1].tstop = bs_cmds[-1]['time']
 
@@ -621,14 +631,14 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
     #  call make_viols
     #
     #-------------------
-    red_viols, cti_viols, fp_sens_viols = make_viols(opt, states, model.times, temps, obs_with_sensitivity, nopref_array)
+    ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols = make_viols(opt, states, model.times, temps, obs_with_sensitivity, nopref_array)
 
     # Write out the states.dat and temperatures.dat files
     write_states(opt, states)
     write_temps(opt, model.times, temps)
 
     return dict(opt=opt, states=states, times=model.times, temps=temps,
-               plots=plots, cti_viols=cti_viols, red_viols=red_viols, fp_sens_viols=fp_sens_viols)
+               plots=plots, cti_viols=cti_viols, ACIS_I_viols=ACIS_I_viols, ACIS_S_viols = ACIS_S_viols, fp_sens_viols=fp_sens_viols)
 #------------------------------------------------------------------------------
 #
 #   make_validation_viols
@@ -830,22 +840,31 @@ def config_logging(outdir, verbose):
     rootlogger = logging.getLogger()
     rootlogger.addHandler(NullHandler())
 
+    logger = logging.getLogger('acisfp_check')
+    logger.setLevel(logging.DEBUG)
+
     loglevel = {0: logging.CRITICAL,
                 1: logging.INFO,
                 2: logging.DEBUG}.get(verbose, logging.INFO)
-
-    logger = logging.getLogger('acisfp_check')
-    logger.setLevel(loglevel)
 
     formatter = logging.Formatter('%(message)s')
 
     console = logging.StreamHandler()
     console.setFormatter(formatter)
+    console.setLevel(loglevel);
     logger.addHandler(console)
 
     filehandler = logging.FileHandler(
         filename=os.path.join(outdir, 'run.dat'), mode='w')
     filehandler.setFormatter(formatter)
+
+    # Set the file loglevel to be at least INFO,
+    # but override to DEBUG if that is requested at the
+    # command line
+    filehandler.setLevel(logging.INFO)
+    if loglevel == logging.DEBUG:
+        filehandler.setLevel(logging.DEBUG)
+
     logger.addHandler(filehandler)
 
 
@@ -903,7 +922,8 @@ def write_index_rst(opt,
                     plots_validation, 
                     valid_viols=None,
                     plots=None, 
-                    red_viols=None, 
+                    ACIS_I_viols=None, 
+                    ACIS_S_viols=None, 
                     fp_sens_viols=None,
                     cti_viols=None):
     """
@@ -936,7 +956,8 @@ def write_index_rst(opt,
     django_context = django.template.Context(
         {'opt': opt,
          'plots': plots,
-         'red_viols': red_viols,
+         'ACIS_I_viols': ACIS_I_viols,
+         'ACIS_S_viols': ACIS_S_viols,
          'fp_sens_viols': fp_sens_viols,
          'cti_viols': cti_viols,
          'valid_viols': valid_viols,
@@ -1052,17 +1073,22 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
     MSID is a global 
 
     obs_with_sensitivity contains all ACIS and CTI observations 
-    and they have had FP sensitivity boolean added
+    and they have had FP sensitivity boolean added. In other words it's
+    All ACIS and ECS runs.
 
     We will create a list of CTI-ONLY runs, and a list of all
     ACIS science runs without CTI runs. These two lists will
     be used to assess the categories of violations:
 
-        1) Any SCIENCE observation that violates the -114 red limit 
+        1) Any ACIS-I observation that violates the -114 red limit 
            is a violation and a load killer
              - science_viols
 
-        2) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7 
+        2) Any ACIS-S observation that violates the -112 red limit 
+           is a violation and a load killer
+             - science_viols
+
+        3) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7 
            results in a "Preferences Not Met" indicator.
              - fp_sense_viols
 
@@ -1071,7 +1097,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
              - cti_viols
   
     """
-    logger.info('\nChecking for limit violations')
+    logger.info('\nMAKE VIOLS Checking for limit violations in '+str(len(states))+' states and\n '+ str(len(obs_with_sensitivity))+ " total science observations")
 
 #    viols = dict((x, []) for x in MSID)
 
@@ -1083,6 +1109,9 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
     #------------------------------------------------------
     # Just the CTI runs
     cti_only_obs = eandf.cti_only_filter(obs_with_sensitivity)
+    # Now divide out observations by ACIS-S and ACIS-I
+    ACIS_S_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-S")
+    ACIS_I_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-I")
 
     # ACIS SCIENCE observations only  - no HRC; no CTI
     non_cti_obs = eandf.cti_filter(obs_with_sensitivity)
@@ -1112,33 +1141,44 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         # load killers but need to be reported
 
         plan_limit = FP_TEMP_SENSITIVE[msid]
-
         cti_viols = search_obsids_for_viols(msid, plan_limit, cti_only_obs, temp, times)
 
         #------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
+        #     These are not load killers
         #------------------------------------------------------------
         logger.info('\n\nFP SENSITIVE SCIENCE ONLY -118.7 violations')
-
+        # Set the limit for  Thos eObservations that are sensitive to the FP Temp
         plan_limit = FP_TEMP_SENSITIVE[msid]
 
         #fp_sens_viols = search_obsids_for_viols(msid, plan_limit, fp_sens_only_obs, temp, times)
         fp_sens_viols = search_obsids_for_viols(msid, plan_limit, fp_sense_without_noprefs, temp, times)
 
         #--------------------------------------------------------------
-        #  Collect any -114C violations of any non-CTI ACIS science run. 
+        #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run. 
         #  These are load killers
         #--------------------------------------------------------------
         # 
-        logger.info('\n\n-114 SCIENCE ONLY violations')
+        logger.info('\n\n-112 ACIS-S SCIENCE ONLY violations')
+        # Set the limit 
+        plan_limit = ACIS_S_RED[msid]
+        ACIS_S_viols = search_obsids_for_viols(msid,  plan_limit, ACIS_S_obs, temp, times)
+     
+        #--------------------------------------------------------------
+        #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run. 
+        #  These are load killers
+        #--------------------------------------------------------------
+        # 
+        logger.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
         # Create the violation data structure.
-        red_viols = dict((x, []) for x in MSID)
+        ACIS_I_viols = dict((x, []) for x in MSID)
 
-        # set the planning limit to the -114 C Red limt
-        plan_limit = RED[msid]
+        # set the planning limit to the -114 C Red limit for ACIS-I observations
+        plan_limit = ACIS_I_RED[msid]
 
-        red_viols = search_obsids_for_viols(msid, plan_limit, non_cti_obs, temp, times)
-    return(red_viols, cti_viols, fp_sens_viols)
+        ACIS_I_viols = search_obsids_for_viols(msid, plan_limit,ACIS_I_obs , temp, times)
+
+    return(ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols)
 
 #------------------------------------------------------------------------------
 #
@@ -1507,7 +1547,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
                                ylim2=(40, 180),
                                figsize=(14, 7),
                                )
-        plots[msid]['ax'].axhline(RED[msid], linestyle='--', color='red',
+        plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
                                   linewidth=2.0)
 
         plots[msid]['ax'].axvline(load_start, linestyle=':', color='g',
@@ -1527,7 +1567,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
         fontsize = 12
         draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
 
-        # Build the file name and putput the plot to a file
+        # Build the file name and output the plot to a file
         filename = MSID[msid].lower() + 'M120toM90.png'
         outfile = os.path.join(opt.outdir, filename)
         logger.info('   Writing plot file %s' % outfile)
@@ -1578,7 +1618,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
 
         #------------------------------------------------------
         #
-        #   PLOT 3 -  fptemp_11 plt with ylim from -120 to -114
+        #   PLOT 3 -  fptemp_11 plt with ylim from -120 to -112
         # 
         #------------------------------------------------------
         #
@@ -1591,7 +1631,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
                                xlabel='Date',
                                ylabel='Temperature (C)',
                                ylabel2='Pitch (deg)',
-                               ylim = (-120, -114),
+                               ylim = (-120, -111.5),
                                ylim2=(40, 180),
                                figsize=(14, 7),
                                )
@@ -1600,7 +1640,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
         #
         paint_perigee(perigee_passages, states, plots, msid)
 
-        # Now draw horizontal lines on the plot running form start to stop
+        # Now draw horizontal lines on the plot running from start to stop
         # and label them with the Obsid
         ypos = -116
         endcapstart =  -116.2
@@ -1612,9 +1652,13 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
 
         # Draw a horizontal line indicating the FP Sensitive Observation Cut off
         plots[msid]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
+        # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
+        plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
+        # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
+        plots[msid]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
  
         # Build the file name and output the file
-        filename = MSID[msid].lower() + 'M120toM114.png'
+        filename = MSID[msid].lower() + 'M120toM112.png'
         outfile = os.path.join(opt.outdir, filename)
         logger.info('   Writing plot file %s' % outfile)
         plots[msid]['fig'].savefig(outfile)
