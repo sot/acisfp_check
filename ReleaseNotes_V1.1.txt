@@ -147,6 +147,15 @@ Testing:
        - Status reported as OK for both classes of violation
        - No Violations Listed
  
+Testing on new loads:
+=====================
+
+MAY0916 - Results reported correctly
+MAY1616 - Results Reported Correctly - No ACIS-I or S violations; 
+                                     - FP Temp Preference reported as
+				       Not Met
+                                     - FP_TEMP Status: OK
+
 
 Interface impacts
 =================

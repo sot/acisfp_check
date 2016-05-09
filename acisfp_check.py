@@ -65,8 +65,6 @@ ACIS_S_RED = dict(fptemp = -112.0)
 
 # ACIS-I max temperatures remain at -114 deg. C
 ACIS_I_RED = dict(fptemp = -114.0)
-ACIS_I_RED = dict(fptemp = -115.0)
-
 
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0),
                                   (99, 3.0)],
