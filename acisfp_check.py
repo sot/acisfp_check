@@ -839,7 +839,7 @@ def config_logging(outdir, verbose):
     rootlogger.addHandler(NullHandler())
 
     logger = logging.getLogger('acisfp_check')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.loglevel)
 
     loglevel = {0: logging.CRITICAL,
                 1: logging.INFO,
