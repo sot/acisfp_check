@@ -838,12 +838,12 @@ def config_logging(outdir, verbose):
     rootlogger = logging.getLogger()
     rootlogger.addHandler(NullHandler())
 
-    logger = logging.getLogger('acisfp_check')
-    logger.setLevel(logging.loglevel)
-
     loglevel = {0: logging.CRITICAL,
                 1: logging.INFO,
                 2: logging.DEBUG}.get(verbose, logging.INFO)
+
+    logger = logging.getLogger('acisfp_check')
+    logger.setLevel(loglevel)
 
     formatter = logging.Formatter('%(message)s')
 
@@ -1790,7 +1790,6 @@ def make_validation_plots(opt, tlm, db):
         good_mask[bad] = False
 
 
-
     plots = []
     logger.info('   Making FPTEMP model validation plots and quantile table')
     quantiles = (1, 5, 16, 50, 84, 95, 99)
@@ -1824,13 +1823,17 @@ def make_validation_plots(opt, tlm, db):
         plot['lines'] = filename
 
         # Make quantiles
+        #
+        # For FPTEMP, the only quantiles we want are those where the temperature is 
+        # -120.0 <= fp temp <= -112.0
         if msid == 'fptemp':
-            ok = (tlm[msid] > -119.7) & (tlm[msid] < -117) # TA
+            ok = (tlm[msid] >= -120.0) & (tlm[msid] <= -112.0) # TA
         else:
             ok = np.ones(len(tlm[msid]), dtype=bool)
 
 
         diff = np.sort(tlm[msid][ok] - pred[msid][ok])
+
         quant_line = "%s" % msid
         for quant in quantiles:
             quant_val = diff[(len(diff) * quant) // 100]

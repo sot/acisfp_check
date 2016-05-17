@@ -116,6 +116,7 @@ Validation Violations
    :header: "MSID", "Quantile", "Value", "Limit"
    :widths: 15, 10, 10, 10
 
+
 {% for viol in valid_viols %}
    {{viol.msid}},{{viol.quant}},{{viol.value}},{{viol.limit|floatformat:2}}
 {% endfor%}
@@ -123,7 +124,6 @@ Validation Violations
 {% else %}
 No Validation Violations
 {% endif %}
-
 
 {% for plot in plots_validation %}
 {{ plot.msid }}
@@ -133,6 +133,10 @@ No Validation Violations
 Red = telemetry, blue = model
 
 .. image:: {{plot.lines}}
+
+Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
+-----------------------------------------------------------------------
+
 .. image:: {{plot.histlog}}
 .. image:: {{plot.histlin}}
 
