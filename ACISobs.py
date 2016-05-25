@@ -294,6 +294,7 @@ class ObsidFindFilter():
         #This constitutes one observation.
  
         for eachstate in cmd_states:
+
             # is this the first WSPOW of the interval?
             if (eachstate.power_cmd == 'WSPOW00000' or eachstate.power_cmd == 'WSVIDALLDN') and \
                (firstpow == ''):
@@ -309,6 +310,7 @@ class ObsidFindFilter():
             # Process the first NPNT line you see
 #            if (eachstate.pcad_mode == 'NPNT' and obsid == '') and (firstpow != ''):
             if (obsid == '') and (firstpow != ''):
+#            if (firstpow != ''):
                 obsid = eachstate.obsid
                 power_cmd = eachstate.power_cmd 
                 si_mode = eachstate.si_mode
@@ -596,7 +598,7 @@ class ObsidFindFilter():
 
     #--------------------------------------------------------------------------
     #
-    #   hrc_science_obs_filter
+    #   hrc_science_obs_filter - filter *OUT* any HRC science observations
     #
     #--------------------------------------------------------------------------
     def hrc_science_obs_filter(self, obsidinterval_list):
@@ -608,8 +610,8 @@ class ObsidFindFilter():
         """
         acis_and_cti_only = []
         for eachobservation in obsidinterval_list:
-            if  ( (eachobservation[self.in_focal_plane] == "ACIS-I") or \
-                  (eachobservation[self.in_focal_plane] == "ACIS-S") or \
+            if  ( ((eachobservation[self.in_focal_plane] == "ACIS-I") or \
+                  (eachobservation[self.in_focal_plane] == "ACIS-S")) or \
                   (eachobservation[self.obsid] >= 50000) ):
                 acis_and_cti_only.append(eachobservation)
         return(acis_and_cti_only)
@@ -628,7 +630,8 @@ class ObsidFindFilter():
         """
         cti_only = []
         for eachobservation in obsidinterval_list:
-            if  (eachobservation[self.obsid] >= 50000):
+            if  (eachobservation[self.obsid] >= 50000)and\
+                (eachobservation[self.in_focal_plane] == "HRC-S"):
                 cti_only.append(eachobservation)
         return(cti_only)
 
@@ -790,6 +793,38 @@ class ObsidFindFilter():
         instrument = observation[self.in_focal_plane]
         return(instrument)
 
+    #----------------------------------------------------------------------
+    #
+    # get_all_instruments
+    #
+    #---------------------------------------------------------------------
+    def get_all_instruments(self, observations):
+        """
+        Given a list element from the list of obsids extracted by this 
+        class, extract the instruments, append to a list  and return it
+        """
+        instrument_list = []
+        for eachobs in observations:
+            instrument_list.append(self.get_instrument(eachobs))
+        return(instrument_list)
+
+    #----------------------------------------------------------------------
+    #
+    #  get_all_specific_instrument
+    #
+    #---------------------------------------------------------------------
+    def get_all_specific_instrument(self, observations, instrument):
+        """
+        Given a list  of obsid intervals extracted by this class
+        class, return the list all those obsids with the specified instrument
+        """
+        same_inst = []
+        for eachobs in observations:
+            if eachobs[self.in_focal_plane] == instrument:
+                same_inst.append(eachobs)
+
+        return(same_inst)
+
 
     #----------------------------------------------------------------------
     #
@@ -891,6 +926,21 @@ class ObsidFindFilter():
         obs_tstop = observation[self.tstop]
         return(obs_tstop)
 
+
+    #----------------------------------------------------------------------
+    #
+    # get_SI_mode_list 
+    #
+    #---------------------------------------------------------------------
+    def get_si_mode_list(self, observation_list):
+        """
+        Given a list of obsids extracted by this class, loop through the 
+        list and return a list of obsids.  The list contains ints
+        """
+        si_mode_list = []
+        for each_observation in observation_list:
+            si_mode_list.append(each_observation[self.obsid])
+        return(si_mode_list)
 
     ######################################################################
     #

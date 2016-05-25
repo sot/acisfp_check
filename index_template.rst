@@ -16,7 +16,7 @@ Summary
 ====================  =============================================
 Date start            {{proc.datestart}}
 Date stop             {{proc.datestop}}
-FP_TEMP status        {%if red_viols.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
+FP_TEMP status        {%if ACIS_I_viols.fptemp or ACIS_S_viols.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
 {% if opt.loaddir %}
 Load directory        {{opt.loaddir}}
 {% endif %}
@@ -26,18 +26,33 @@ Temperatures          `<temperatures.dat>`_
 States                `<states.dat>`_
 ====================  =============================================
 
-{% if red_viols.fptemp  %}
-FP_TEMP -114 deg C Violations
-------------------------------
+{% if ACIS_I_viols.fptemp  %}
+ACIS-I FP_TEMP -114 deg C Violations
+------------------------------------
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     Obsids
 =====================  =====================  ==================  ==================
-{% for viol in red_viols.fptemp %}
+{% for viol in ACIS_I_viols.fptemp %}
 {{viol.datestart}}  {{viol.datestop}}  {{viol.maxtemp|floatformat:2}}            {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No -114 deg C FP_TEMP Violations
+No ACIS-I -114 deg C FP_TEMP Violations
+{% endif %}
+
+
+{% if ACIS_S_viols.fptemp  %}
+ACIS-S FP_TEMP -112 deg C Violations
+------------------------------------
+=====================  =====================  ==================  ==================
+Date start             Date stop              Max temperature     Obsids
+=====================  =====================  ==================  ==================
+{% for viol in ACIS_S_viols.fptemp %}
+{{viol.datestart}}  {{viol.datestop}}  {{viol.maxtemp|floatformat:2}}            {{viol.obsid}}
+{% endfor %}
+=====================  =====================  ==================  ==================
+{% else %}
+No ACIS-S -112 deg C FP_TEMP Violations
 {% endif %}
 
 
@@ -52,7 +67,7 @@ Date start             Date stop              Max temperature     OBSID
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Violations
+No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Preferences Unmet
 {% endif %}
 
 
@@ -101,6 +116,7 @@ Validation Violations
    :header: "MSID", "Quantile", "Value", "Limit"
    :widths: 15, 10, 10, 10
 
+
 {% for viol in valid_viols %}
    {{viol.msid}},{{viol.quant}},{{viol.value}},{{viol.limit|floatformat:2}}
 {% endfor%}
@@ -108,7 +124,6 @@ Validation Violations
 {% else %}
 No Validation Violations
 {% endif %}
-
 
 {% for plot in plots_validation %}
 {{ plot.msid }}
@@ -118,6 +133,10 @@ No Validation Violations
 Red = telemetry, blue = model
 
 .. image:: {{plot.lines}}
+
+Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
+-----------------------------------------------------------------------
+
 .. image:: {{plot.histlog}}
 .. image:: {{plot.histlin}}
 

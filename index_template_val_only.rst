@@ -1,5 +1,5 @@
 =======================
-DPA temperatures check
+FP_Temp temperatures check
 =======================
 .. role:: red
 
@@ -22,7 +22,7 @@ Run log               `<run.dat>`_
 ====================  =============================================
 
 =======================
-DPA Model Validation
+FP Model Validation
 =======================
 
 MSID quantiles

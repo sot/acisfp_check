@@ -1,8 +1,7 @@
 MANIFEST
-Makefile
-dpa_check
-dpa_check.py
-dpa_model_spec.json
+acisfp_spec.json
+ACISobs.py
+acisfp_check.py
 VERSION
 index_template.rst
-dpa_check.css
+acisfp_check.css

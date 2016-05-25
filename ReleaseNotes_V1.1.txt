@@ -1,0 +1,175 @@
+
+Change Description
+==================
+
+  This new version (1.1) of the ACIS Focal Plane Thermal Model has
+  three categories of changes:
+
+    I) Create the run.dat file regardless of the value of the verbose
+       switch
+ 
+   II) Do not label the run "NOT OK" when a preference for a cold and
+       stable focal plane temperature has not been met. Also, whether
+       the preference was met or not met, the report used the term
+       "violation" This was changed to "Preference Not Met".
+
+  III) Split out ACIS-I observations from ACIS-S and assign different
+       violation temperatures to the two different categories.
+
+Rationale
+==========
+    I) It was observed that the model did not write out the run.dat file
+     for cetain values of the verbose switch.  We want the run.dat
+     file to be created for any verbosity level.
+
+   II) ACIS observations with certain characteristics have a preference
+      for a cold and stable focal plane temperature. Prior to this
+      update,  when the preference was not met the Status output by
+      the model was "NOT OK".  As this is only a preference and not a 
+      requiremnent of the observation, the output status should be
+      "OK" even if the preference is not met. Likewise, use of the
+      term "violation" was too strong. 
+
+
+  III) After much discussion, the idea of changing the violation
+       temperature of all ACIS-S observations to -112.0 deg. C was approved.
+       The violation temperature for ACIS-I observations would remain
+       unchanged at -114.0 deg. C.  Now that this change is
+       operational, the behavior of the ACIS Focal Plane Predictive
+       model must also change to reflect that new set of limits.
+
+       The plot showing the range of focal plane temperatures going
+       from -120 to -114 was changed to -120 to -111.5.  Horizontal
+       lines were added to illustrate the ACIS-I and ACIS-S
+       limits. The file name was also modified.
+
+
+Files Changed:
+============== 
+
+	ACISobs.py
+	MANIFEST
+	VERSION
+	acisfp_check.py
+	index_template.rst
+	index_template_val_only.rst
+        html4css1.css
+
+  index_template_val_only.rst was modified to correct the comments.
+
+
+Justification:
+==============
+
+    I) We want the run.dat file to be available under all verbose modes -
+       both in testing and in operational use.
+
+   II) The Status line on the report is the first indicator the ACIS Ops
+       person uses to determine that the load is ok from a Focal Plane
+       Thermal point of view.  A report of "OK" means the load is ok; a
+       report of "NOT OK" means the load may have to be rejected.
+
+       As meeting the cold and stable focal plane value is a preference and
+       not a requirement, "NOT OK" is not a valid response, and the
+       use of the term "violation" too strong.
+
+  III) Violations of the thermal limits are a valid reason for
+       rejecting the load. As the limit for ACIS-S observations were split
+       out and given a different value than used for ACIS-I observations,
+       the model violation assessment code had to be changed, as well
+       as the reporting code.
+
+
+Testing:
+======== 
+
+    I) The model was run with verbosity set at 0, 1 and 2. The run.dat
+       file is now created in all three cases.
+ 
+   II) Two loads were used to perform the testing as they displayed
+       all the different characteristics of observations that are
+       sensitive to a cold and stable focal plane temperature:
+
+          - Observations which prefer a cold and stable focal plane
+            temperature
+
+              - Which were Met
+              - Which were Not Met
+
+          - Observations whose characteristics imply a preferred cold
+            and stable focal plane temperature but the preference has
+            been waived.
+
+
+
+   APR0416 
+
+      - 17233 18825 are FP Temp sensitive and in fp_sensitive.txt
+      - Neither obs appears in the No Preferences list. 
+      - The preference was not met in the actual run
+      - Actual run Status was NOT OK
+
+      After the changes:
+        - Load reported OK
+        - preferences were shown to "Not Met" as opposed to "Violation"
+
+      - Temporarily set 17233 in the No Pref file
+        - No Longer shows in the Pref Not Met table
+        - painted purple on the plot
+     ALL PASSED
+
+  APR1816 
+
+      - 18068 is in the NOPREF file so it's painted purple.
+      - No violation reported.
+      - Checks to be sure that 18068 purple NO PREF is displayed
+
+
+ III)  APR1816 
+
+   Set ACIS_I_RED to -115 to generate violations
+     PASSED
+       - Status reported as NOT OK
+       - Correct Violations Listed
+       
+   Set ACIS_S_RED to -115 to generate violations
+     PASSED
+       - Status reported as NOT OK
+       - Correct Violations Listed
+    
+   Set both ACIS_I_RED and ACIS_S_RED to -115 to generate violations
+     PASSED
+       - Status reported as NOT OK
+       - Correct Violations Listed
+ 
+   Neither ACIS_I_RED and ACIS_S_RED generates violations
+     PASSED
+       - Status reported as OK for both classes of violation
+       - No Violations Listed
+ 
+Testing on new loads:
+=====================
+
+MAY0916 - Results reported correctly
+MAY1616 - Results Reported Correctly - No ACIS-I or S violations; 
+                                     - FP Temp Preference reported as
+				       Not Met
+                                     - FP_TEMP Status: OK
+        - This corrects the faulty 
+
+Interface impacts
+=================
+
+There are no interface impacts.
+
+
+Review
+====== 
+
+
+
+Deployment Plan
+===============
+
+Once approved at a Load Review telecon the software will be installed
+in the operational area.
