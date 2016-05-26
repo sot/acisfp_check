@@ -3,7 +3,7 @@ Change Description
 ==================
 
   This new version (1.1) of the ACIS Focal Plane Thermal Model has
-  three categories of changes:
+  four categories of changes in the reporting section:
 
     I) Create the run.dat file regardless of the value of the verbose
        switch
@@ -16,32 +16,43 @@ Change Description
   III) Split out ACIS-I observations from ACIS-S and assign different
        violation temperatures to the two different categories.
 
+   IV) Expand the temperature range of the FP Temp residual plots
+       (both log and lin plots)
+
+
 Rationale
 ==========
     I) It was observed that the model did not write out the run.dat file
-     for cetain values of the verbose switch.  We want the run.dat
-     file to be created for any verbosity level.
+       for cetain values of the verbose switch.  We want the run.dat
+       file to be created for any verbosity level.
 
    II) ACIS observations with certain characteristics have a preference
-      for a cold and stable focal plane temperature. Prior to this
-      update,  when the preference was not met the Status output by
-      the model was "NOT OK".  As this is only a preference and not a 
-      requiremnent of the observation, the output status should be
-      "OK" even if the preference is not met. Likewise, use of the
-      term "violation" was too strong. 
+       for a cold and stable focal plane temperature. Prior to this
+       update,  when the preference was not met the Status output by
+       the model was "NOT OK".  As this is only a preference and not a 
+       requiremnent of the observation, the output status should be
+       "OK" even if the preference is not met. Likewise, use of the
+       term "violation" was too strong. 
 
 
   III) After much discussion, the idea of changing the violation
        temperature of all ACIS-S observations to -112.0 deg. C was approved.
        The violation temperature for ACIS-I observations would remain
        unchanged at -114.0 deg. C.  Now that this change is
-       operational, the behavior of the ACIS Focal Plane Predictive
-       model must also change to reflect that new set of limits.
+       operational, the behavior of the violations assessment of the 
+       ACIS Focal Plane program must also change, as well as the
+       reporting section, to reflect that new set of limits.
 
        The plot showing the range of focal plane temperatures going
        from -120 to -114 was changed to -120 to -111.5.  Horizontal
        lines were added to illustrate the ACIS-I and ACIS-S
        limits. The file name was also modified.
+
+   IV) The Focal Plane residual plots were previously limited to
+       temperatures no higher than -117.0.  With the ACIS-I and ACIS-S
+       limits of -114.0 deg. C and -112.0 deg. C respectively, the
+       range of presented residuals was expanded accordingly.
+
 
 
 Files Changed:
@@ -79,6 +90,8 @@ Justification:
        the model violation assessment code had to be changed, as well
        as the reporting code.
 
+   IV) We need to be able to observe residuals at pertinent high
+       temperature limits for ACIS observations.
 
 Testing:
 ======== 
@@ -147,6 +160,8 @@ Testing:
        - Status reported as OK for both classes of violation
        - No Violations Listed
  
+  IV) All residual plots displayed residuals in the expanded envelope.
+
 Testing on new loads:
 =====================
 
@@ -155,7 +170,12 @@ MAY1616 - Results Reported Correctly - No ACIS-I or S violations;
                                      - FP Temp Preference reported as
 				       Not Met
                                      - FP_TEMP Status: OK
-        - This corrects the faulty 
+        - This corrects the fault 
+
+MAY2316 - Results Reported Correctly - No ACIS-I or S violations; 
+                                     - FP Temp Preference reported as
+				       Not Met
+                                     - FP_TEMP Status: OK
 
 Interface impacts
 =================
@@ -166,6 +186,8 @@ There are no interface impacts.
 Review
 ====== 
 
+ACIS Ops Team
+Tom Aldcroft
 
 
 Deployment Plan
