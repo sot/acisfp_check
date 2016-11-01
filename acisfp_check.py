@@ -399,12 +399,10 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=No
     # model.comp Not in xija documentation
     model.comp['dh_heater'].set_data(dh_heater, dh_heater_times)
 
-    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded states 
-    # but they are in telemetry
-
-
-    # We have to manually insert the aoattqt<x> valued because some items are sampled on
-    # 5 minute intervals and some are not.
+    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded
+    #  states  but they are in telemetry
+    # We have to manually insert the aoattqt<x> valued because some items 
+    # are sampled on 5 minute intervals and some are not.
     for i in range(1, 5):
         name = 'aoattqt{}'.format(i)
         state_name = 'q{}'.format(i)
@@ -1263,9 +1261,10 @@ def paint_perigee(perigee_passages, states, plots, msid):
           # now plot the line.
           plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
 
-          # Plot the perigee passage time
-          perigee_time = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[3]).secs])
-          plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', color='black', linewidth=2.0)
+          # Plot the perigee passage time so long as it was specified in the CTI_report file
+          if eachpassage[3] != "Not-within-load":
+              perigee_time = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[3]).secs])
+              plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', color='black', linewidth=2.0)
           
 
 #----------------------------------------------------------------------
