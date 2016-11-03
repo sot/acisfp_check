@@ -1,2 +1,1 @@
-/proj/sot/ska/bin/python acisfp_check.py --oflsdir /data/acis/LoadReviews/2016/$1/ofls --model-spec='acisfp_spec.json' --verbose=1  --outdir=/home/gregg/Desktop/out_fptemp
-
+/proj/sot/ska/bin//python /home/gregg/FPMODEL/acisfp_check/acisfp_check.py --oflsdir=/data/acis/LoadReviews/2016/$1/ofls --outdir=/home/gregg/FPMODEL/acisfp_check/CRM/ --model-spec=/home/gregg/FPMODEL/acisfp_check/acisfp_spec.json --verbose=2
