@@ -15,10 +15,10 @@
 #                        of states from the Commanded States Data base
 #
 ###############################################################################
-import Chandra.Time
+from Chandra.Time import DateTime
 import Ska.engarchive.fetch_sci as fetch
-import Chandra.cmd_states
 from Ska.DBI import DBI
+
 #------------------------------------------------------------------
 #
 # get_last_data_date
@@ -30,15 +30,14 @@ def get_last_data_date():
     SKA Engineering Archive
     """
     tdata = fetch.MSID('1DPAMZT', '2012:100', '2024:364')
-    lag_date = Chandra.Time.DateTime(tdata.times[-1]).date
-    return(lag_date)
+    return DateTime(tdata.times[-1]).date
 
 #----------------------------------------------------------------
 #
 # who_in_fp.py               
 #
 #----------------------------------------------------------------
-def who_in_fp(simpos = 80655):
+def who_in_fp(simpos=80655):
     """
     Returns a string telling you which instrument is in 
     the Focal Plane. "launchlock" is returned because that's a position we never expect to see 
@@ -164,8 +163,8 @@ class ObsidFindFilter():
 
         """
         # convert begin and end into sybase query tstart and tstop
-        tstart = Chandra.Time.DateTime(tbegin)
-        tstop =   Chandra.Time.DateTime(tend)
+        tstart = DateTime(tbegin)
+        tstop =   DateTime(tend)
         #
         #form the query for everything, starting from tstart date to now
         #
@@ -300,12 +299,12 @@ class ObsidFindFilter():
                (firstpow == ''):
                 firstpow = eachstate
                 DOYfetchstart = eachstate.datestart
-                secsfetchstart = Chandra.Time.DateTime(DOYfetchstart).secs
+                secsfetchstart = DateTime(DOYfetchstart).secs
 
             # Process the first XTZ0000005 line you see
             if (eachstate.power_cmd == 'XTZ0000005' or eachstate.power_cmd == 'XCZ0000005' ) and \
                ( xtztime == '' and firstpow != ''):
-                xtztime = Chandra.Time.DateTime(eachstate.datestart).secs
+                xtztime = DateTime(eachstate.datestart).secs
 
             # Process the first NPNT line you see
 #            if (eachstate.pcad_mode == 'NPNT' and obsid == '') and (firstpow != ''):
@@ -336,9 +335,9 @@ class ObsidFindFilter():
 
             # Process the first AA00000000 line you see
             if eachstate.power_cmd == 'AA00000000' and aa0time == '' and firstpow != '':
-                aa0time = Chandra.Time.DateTime(eachstate.datestart).secs
+                aa0time = DateTime(eachstate.datestart).secs
                 DOYfetchstop = eachstate.datestop
-                secsfetchstop = Chandra.Time.DateTime(DOYfetchstop).secs
+                secsfetchstop = DateTime(DOYfetchstop).secs
 
                 # now calculate the exposure time
                 if xtztime != '':
@@ -614,7 +613,7 @@ class ObsidFindFilter():
                   (eachobservation[self.in_focal_plane] == "ACIS-S")) or \
                   (eachobservation[self.obsid] >= 50000) ):
                 acis_and_cti_only.append(eachobservation)
-        return(acis_and_cti_only)
+        return acis_and_cti_only
 
 
     #--------------------------------------------------------------------------
@@ -633,7 +632,7 @@ class ObsidFindFilter():
             if  (eachobservation[self.obsid] >= 50000)and\
                 (eachobservation[self.in_focal_plane] == "HRC-S"):
                 cti_only.append(eachobservation)
-        return(cti_only)
+        return cti_only
 
 
     #--------------------------------------------------------------------------
@@ -653,7 +652,7 @@ class ObsidFindFilter():
             if  (len(eachobservation) >= self.is_fp_sensitive) and \
                 (eachobservation[self.is_fp_sensitive] == True):
                 fp_only.append(eachobservation)
-        return(fp_only)
+        return fp_only
 
 
     #----------------------------------------------------------------------
@@ -718,7 +717,7 @@ class ObsidFindFilter():
 
 
         # Return the list filtered on Pitch.
-        return(pitchlist)
+        return pitchlist
 
 
 
@@ -739,7 +738,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         ccd_count = observation[self.ccd_count]
-        return(ccd_count)
+        return ccd_count
 
     #----------------------------------------------------------------------
     #
@@ -752,7 +751,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         datestart = observation[self.datestart]
-        return(datestart)
+        return datestart
 
     #----------------------------------------------------------------------
     #
@@ -765,7 +764,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         datestop = observation[self.datestop]
-        return(datestop)
+        return datestop
 
     #----------------------------------------------------------------------
     #
@@ -778,7 +777,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         exptime = observation[self.exptime]
-        return(exptime)
+        return exptime
 
     #----------------------------------------------------------------------
     #
@@ -791,7 +790,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         instrument = observation[self.in_focal_plane]
-        return(instrument)
+        return instrument
 
     #----------------------------------------------------------------------
     #
@@ -806,7 +805,7 @@ class ObsidFindFilter():
         instrument_list = []
         for eachobs in observations:
             instrument_list.append(self.get_instrument(eachobs))
-        return(instrument_list)
+        return instrument_list
 
     #----------------------------------------------------------------------
     #
@@ -823,7 +822,7 @@ class ObsidFindFilter():
             if eachobs[self.in_focal_plane] == instrument:
                 same_inst.append(eachobs)
 
-        return(same_inst)
+        return same_inst
 
 
     #----------------------------------------------------------------------
@@ -840,7 +839,7 @@ class ObsidFindFilter():
         obsid = None
         if observation != []:
             obsid = observation[self.obsid]
-        return(obsid)
+        return obsid
 
 
     #----------------------------------------------------------------------
@@ -856,7 +855,7 @@ class ObsidFindFilter():
         obsid_list = []
         for each_observation in observation_list:
             obsid_list.append(each_observation[self.obsid])
-        return(obsid_list)
+        return obsid_list
 
 
     #----------------------------------------------------------------------
@@ -870,7 +869,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it
         """
         pitch = observation[self.pitch]
-        return(pitch)
+        return pitch
 
 
     #----------------------------------------------------------------------
@@ -884,7 +883,7 @@ class ObsidFindFilter():
         class, extract the sim position and return it
         """
         sensitivity = observation[self.is_fp_sensitive]
-        return(sensitivity)
+        return sensitivity
 
 
     #----------------------------------------------------------------------
@@ -898,7 +897,7 @@ class ObsidFindFilter():
         class, extract the sim position and return it
         """
         sim_position = observation[self.simpos]
-        return(sim_position)
+        return sim_position
 
     #----------------------------------------------------------------------
     #
@@ -911,7 +910,7 @@ class ObsidFindFilter():
         class, extract the tstart and return it
         """
         obs_tstart = observation[self.tstart]
-        return(obs_tstart)
+        return obs_tstart
 
     #----------------------------------------------------------------------
     #
@@ -924,7 +923,7 @@ class ObsidFindFilter():
         class, extract the tstop and return it
         """
         obs_tstop = observation[self.tstop]
-        return(obs_tstop)
+        return obs_tstop
 
 
     #----------------------------------------------------------------------
