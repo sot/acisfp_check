@@ -1567,7 +1567,8 @@ def main():
                                     MARGIN, VALIDATION_LIMITS,
                                     HIST_LIMIT, calc_model,
                                     other_telem=['1dahtbon'],
-                                    other_map={'1dahtbon': 'dh_heater'})
+                                    other_map={'1dahtbon': 'dh_heater', 
+                                               "fptemp_11": "fp_temp"})
     try:
         acisfp_check.driver(args, state_builder)
     except Exception as msg:
