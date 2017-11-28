@@ -2,42 +2,51 @@
 
 """
 ========================
-acisfp_check
+dpa_check
 ========================
 
 This code generates backstop load review outputs for checking the ACIS
-Focal Plane Temperature: FP_TEMP.  It also generates FP_TEMP model validation
-plots comparing predicted values to telemetry for the previous three weeks.
+focal plane temperature: FP_TEMP11. It also generates FP_TEMP11 model 
+validation plots comparing predicted values to telemetry for the 
+previous three weeks.
 """
+from __future__ import print_function
 
-import sys
-import os
+# Matplotlib setup                                                                                                                                              
+# Use Agg backend for command-line (non-interactive) operation                                                                                                   
+import matplotlib
+matplotlib.use('Agg')
+
+
 import glob
 import logging
 from pprint import pformat
 import re
 import time
-import shutil
 import pickle
 
-import numpy as np
 import Ska.DBI
 import Ska.Table
 import Ska.Numpy
 import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime
-from Chandra.Time import date2secs
 
 import Chandra.cmd_states as cmd_states
-# Matplotlib setup
-# Use Agg backend for command-line (non-interactive) operation
-import matplotlib
-if __name__ == '__main__':
-    matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import Ska.Matplotlib
 
+from Chandra.Time import date2secs
+from astropy.io import ascii
+import numpy as np
 import xija
+from acis_thermal_check import \
+    ACISThermalCheck, \
+    calc_off_nom_rolls, \
+    get_options, \
+    make_state_builder, \
+    get_acis_limits, mylog
+import os
+import sys
+
+model_path = os.path.abspath(os.path.dirname(__file__))
 
 #
 # Import ACIS-specific observation extraction, filtering 
@@ -48,11 +57,9 @@ import ACISobs
 #
 # INIT
 #
-MSID = dict(fptemp = 'FPTEMP')
-
-YELLOW = dict(fptemp = -50.0)
-
-MARGIN = dict(fptemp = 2.5)
+MSID = {"fptemp": "FPTEMP"}
+YELLOW = {"fptemp": -50.0}
+MARGIN = {"fptemp": 2.5}
 
 # This is the cutoff temperature for any FPTEMP sensitive observation
 # if the FP temp goes above this number, and the obswervation is sensitive to
@@ -66,127 +73,113 @@ ACIS_S_RED = dict(fptemp = -112.0)
 # ACIS-I max temperatures remain at -114 deg. C
 ACIS_I_RED = dict(fptemp = -114.0)
 
-VALIDATION_LIMITS = {'PITCH': [(1, 3.0),
-                                  (99, 3.0)],
-                     'TSCPOS': [(1, 2.5),
-                                (99, 2.5)]
+VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
+                     'TSCPOS': [(1, 2.5), (99, 2.5)]
                      }
 
-TASK_DATA = os.path.dirname(__file__)
+HIST_LIMIT = [-120.0]
 
 #
 # Initialize the logger. Set up a file for log output
 #
 logger = logging.getLogger('acisfp_check')
 
-#
 URL = "file:///home/gregg/git/xija/models/acisfp"
 
-_versionfile = os.path.join(os.path.dirname(__file__), 'VERSION')
-VERSION = open(_versionfile).read().strip()
-#------------------------------------------------------------------------------
-#
-#   get_option - extract the command line arguments
-#
-#------------------------------------------------------------------------------
-def get_options():
+def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=None, 
+               dh_heater=None, dh_heater_times=None):
     """
-    Set command line argument defaults, then extract any command line arguments
-    specified by the user.
+    Create and run the Thermal Model for the Focal Plane temperature.
 
-    NOTE: This parser used optparse. According to the PYTHON documents, This is
-          a deprecated module:
-
-          http://docs.python.org/library/optparse.html
-
-          Deprecated since version 2.7: The optparse module is deprecated 
-          and will not be developed further; development will continue 
-          with the argparse module.
-
+    Given: Model name (some string)
+           Commanded States collected by make_week_predict
+           start time
+           Stop Time
+           T_acisfp
+           T_acisfp_times
     """
-    from optparse import OptionParser
-    parser = OptionParser()
-    parser.set_defaults()
-    parser.add_option("--outdir",
-                      default="out",
-                      help="Output directory")
+    # Start by creating the basic modeling framework for a XIJA Thermal Model
+    # Give it some name, start and stop time and the name of the JSON file
+    # --------------
+    # THERMAL_MODEL
+    # --------------
+    model = xija.ThermalModel('acisfp', start=start, stop=stop, model_spec=model_spec)
 
-    parser.add_option("--oflsdir",
-                       help="Load products OFLS directory")
+    # create a numpy array of the start and stop times in the 
+    # commanded states array fetched by make_week_predict
+    times = np.array([states['tstart'], states['tstop']])
 
-    parser.add_option("--model-spec",
-                      default=os.path.join(TASK_DATA, 'acisfp_spec.json'),
-                       help="ACIS FOCAL PLANE model specification file")
+    # Now set any data values for the components of your model
+    # What you have to push in manually are:
+    #       any states information like vid_board or ccd count
+    #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
+    #       any single value initializations you think ought to be made.
+    #         - e.g. fptemp in this case since it's what you are looking for.
 
-    parser.add_option("--days",
-                      type='float',
-                      default=21.0,
-                      help="Days of validation data (days)")
+    # For each item in the Commanded States data structure which matters to us,
+    # insert the values in the commanded states data structure into the model:
+    # 
+    # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
+    # array have to be manually shoved in.
+    #
+    # pitch comes from the telemetry
+    model.comp['eclipse'].set_data(False)
+    model.comp['sim_z'].set_data(states['simpos'], times)
+    model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
 
-    parser.add_option("--run-start",
-                      help="Reference time to replace run start time "
-                           "for regression testing")
+    #  
+    for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
+        model.comp[name].set_data(states[name], times)
 
-    parser.add_option("--traceback",
-                      default=True,
-                      help='Enable tracebacks')
+    # model.comp Not in xija documentation
+    model.comp['dh_heater'].set_data(dh_heater, dh_heater_times)
 
-    parser.add_option("--verbose",
-                      type='int',
-                      default=1,
-                      help="Verbosity (0=quiet, 1=normal, 2=debug)")
+    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded
+    #  states  but they are in telemetry
+    # We have to manually insert the aoattqt<x> valued because some items 
+    # are sampled on 5 minute intervals and some are not.
+    for i in range(1, 5):
+        name = 'aoattqt{}'.format(i)
+        state_name = 'q{}'.format(i)
+        model.comp[name].set_data(states[state_name], times)
 
-    parser.add_option("--ccd-count",
-                      type='int',
-                      default=6,
-                      help="Initial number of CCDs (default=6)")
+    # Get ephemeris from eng archive
+    for axis in ('x', 'y', 'z'):
+        name = 'orbitephem0_{}'.format(axis)
+        msid = fetch.Msid(name, model.tstart - 2000, model.tstop + 2000)
+        model.comp[name].set_data(msid.vals, msid.times)
 
-    parser.add_option("--fep-count",
-                      type='int',
-                      default=6,
-                      help="Initial number of FEPs (default=6)")
+    # Set some initial values. Some of these are superfluous. You do this because some
+    # of these values may not be set at the actual start time. The telemetry might not have
+    # reached that point
+    model.comp['dpa_power'].set_data(0.0)
+    model.comp['1cbat'].set_data(-53.0)
+    model.comp['sim_px'].set_data(-120.0)
+    model.comp['fptemp'].set_data(-120.0)
 
-    parser.add_option("--vid-board",
-                      type='int',
-                      default=1,
-                      help="Initial state of ACIS vid_board (default=1)")
+    # Create the model
+    model.make()
+    model.calc()
 
-    parser.add_option("--clocking",
-                      type='int',
-                      default=1,
-                      help="Initial state of ACIS clocking (default=1)")
+    return model
 
-    parser.add_option("--simpos",
-                      default=75616,
-                      type='float',
-                      help="Starting SIM-Z position (steps)")
+class ACISFPModelCheck(ACISThermalCheck):
 
-    parser.add_option("--pitch",
-                      default=150.0,
-                      type='float',
-                      help="Starting pitch (deg)")
-
-    parser.add_option("--T_acisfp",
-                      type='float',
-                      help="Starting FPTEMP temperature (degC)")
-
-    # adding dh_heater
-    parser.add_option("--dh_heater",
-                      type='int',
-                      default=0,
-                      help="Starting Detector Housing Heater state")
-
-    # adding FP Sensitive NoPref File
-    parser.add_option("--fps_nopref",
-                      default="/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt",
-                      help="full path to the FP sensitive nopref file")
-
-    parser.add_option("--version",
-                      action='store_true',
-                      help="Print version")
-
-    opt, args = parser.parse_args()
-    return opt, args
+    def calc_model_wrapper(self, model_spec, states, tstart, tstop, state0=None):
+        if state0 is None:
+            start_msid = None
+            dh_heater = None
+            dh_heater_times = None
+        else:
+            start_msid = state0[self.msid]
+            htrbfn = os.path.join(self.bsdir, 'dahtbon_history.rdb')
+            mylog.info('Reading file of dahtrb commands from file %s' % htrbfn)
+            htrb = ascii.read(htrbfn, format='rdb')
+            dh_heater_times = date2secs(htrb['time'])
+            dh_heater = htrb['dahtbon'].astype(bool)
+        return self.calc_model(model_spec, states, tstart, tstop, T_acisfp=start_msid,
+                               T_acisfp_times=None, dh_heater=dh_heater, 
+                               dh_heater_times=dh_heater_times)
 
 ###############################################################################
 #
@@ -346,87 +339,6 @@ def main(opt):
                 plots_validation=plots_validation)
 
     
-
-#------------------------------------------------------------------------------
-#
-#   calc_model
-#
-#------------------------------------------------------------------------------
-def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
-    """
-    Create and run the Thermal Model for the Focal Plane temperature.
-    
-    Given: Model name (some string)
-           Commanded States collected by make_week_predict
-           start time
-           Stop Time
-           T_acisfp
-           T_acisfp_times
-    """
-    # Start by creating the basic modeling framework for a XIJA Thermal Model
-    # Give it some name, start and stop time and the name of the JSON file
-    #--------------
-    # THERMAL_MODEL
-    #--------------
-    model = xija.ThermalModel('acisfp', start=start, stop=stop, model_spec=model_spec)
-
-    # create a numpy array of the start and stop times in the 
-    # commanded states array fetched by make_week_predict
-    times = np.array([states['tstart'], states['tstop']])
-
-    # Now set any data values for the components of your model
-    # What you have to push in manually are:
-    #       any states information like vid_board or ccd count
-    #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
-    #       any single value initializations you think ought to be made.
-    #         - e.g. fptemp in this case since it's what you are looking for.
-
-    # For each item in the Commanded States data structure which matters to us,
-    # insert the values in the commanded states data structure into the model:
-    # 
-    # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
-    # array have to be manually shoved in.
-    #
-    # pitch comes from the telemetry
-    model.comp['eclipse'].set_data(False)
-    model.comp['sim_z'].set_data(states['simpos'], times)
-    model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
-
-    #  
-    for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
-        model.comp[name].set_data(states[name], times)
-
-    # model.comp Not in xija documentation
-    model.comp['dh_heater'].set_data(dh_heater, dh_heater_times)
-
-    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded
-    #  states  but they are in telemetry
-    # We have to manually insert the aoattqt<x> valued because some items 
-    # are sampled on 5 minute intervals and some are not.
-    for i in range(1, 5):
-        name = 'aoattqt{}'.format(i)
-        state_name = 'q{}'.format(i)
-        model.comp[name].set_data(states[state_name], times)
-
-    # Get ephemeris from eng archive
-    for axis in ('x', 'y', 'z'):
-        name = 'orbitephem0_{}'.format(axis)
-        msid = fetch.Msid(name, model.tstart - 2000, model.tstop + 2000)
-        model.comp[name].set_data(msid.vals, msid.times)
-
-    # Set some initial values. Some of these are superfluous. You do this because some
-    # of these values may not be set at the actual start time. The telemetry might not have
-    # reached that point
-    model.comp['dpa_power'].set_data(0.0)
-    model.comp['1cbat'].set_data(-53.0)
-    model.comp['sim_px'].set_data(-120.0)
-    model.comp['fptemp'].set_data(-120.0)
-
-    # Create the model
-    model.make()
-    model.calc()
-
-    return model
 
 
 #------------------------------------------------------------------------------
@@ -681,22 +593,6 @@ def make_validation_viols(plots_validation):
 
 #------------------------------------------------------------------------------
 #
-#   get_bs_cmds - 
-#
-#------------------------------------------------------------------------------
-def get_bs_cmds(oflsdir):
-    """Return commands from the backstop file in opt.oflsdir.
-    """
-    import Ska.ParseCM
-    backstop_file = globfile(os.path.join(oflsdir, 'CR*.backstop'))
-    logger.info('   log - Using backstop file %s' % backstop_file)
-    bs_cmds = Ska.ParseCM.read_backstop(backstop_file)
-    logger.info('   log - Found %d backstop commands between %s and %s' %
-                  (len(bs_cmds), bs_cmds[0]['date'], bs_cmds[-1]['date']))
-
-    return bs_cmds
-#------------------------------------------------------------------------------
-#
 #   get_telem_values
 #
 #------------------------------------------------------------------------------
@@ -779,134 +675,6 @@ def get_telem_values(tstart, msids, days=14, name_map={}):
     out = Ska.Numpy.structured_array(vals, colnames=outnames)
 
     return out
-
-
-#------------------------------------------------------------------------------
-#
-#   rst_to_html
-#
-#------------------------------------------------------------------------------
-def rst_to_html(opt, proc):
-    """Run rst2html.py to render index.rst as HTML"""
-
-    # First copy CSS files to outdir
-    import Ska.Shell
-    import docutils.writers.html4css1
-    dirname = os.path.dirname(docutils.writers.html4css1.__file__)
-    shutil.copy2(os.path.join(dirname, 'html4css1.css'), opt.outdir)
-
-    shutil.copy2(os.path.join(TASK_DATA, 'acisfp_check.css'), opt.outdir)
-
-    spawn = Ska.Shell.Spawn(stdout=None)
-    infile = os.path.join(opt.outdir, 'index.rst')
-    outfile = os.path.join(opt.outdir, 'index.html')
-    status = spawn.run(['rst2html.py',
-                        '--stylesheet-path={}'
-                        .format(os.path.join(opt.outdir, 'acisfp_check.css')),
-                        infile, outfile])
-    if status != 0:
-        proc['errors'].append('rst2html.py failed with status {}: see run log'
-                              .format(status))
-        logger.error('rst2html.py failed')
-        logger.error(''.join(spawn.outlines) + '\n')
-
-    # Remove the stupid <colgroup> field that docbook inserts.  This
-    # <colgroup> prevents HTML table auto-sizing.
-    del_colgroup = re.compile(r'<colgroup>.*?</colgroup>', re.DOTALL)
-    outtext = del_colgroup.sub('', open(outfile).read())
-    open(outfile, 'w').write(outtext)
-
-
-#------------------------------------------------------------------------------
-#
-#   config_logging
-#
-#------------------------------------------------------------------------------
-def config_logging(outdir, verbose):
-    """Set up file and console logger.
-    See http://docs.python.org/library/logging.html
-              #logging-to-multiple-destinations
-    """
-    # Disable auto-configuration of root logger by adding a null handler.
-    # This prevents other modules (e.g. Chandra.cmd_states) from generating
-    # a streamhandler by just calling logging.info(..).
-    class NullHandler(logging.Handler):
-        def emit(self, record):
-            pass
-    rootlogger = logging.getLogger()
-    rootlogger.addHandler(NullHandler())
-
-    loglevel = {0: logging.CRITICAL,
-                1: logging.INFO,
-                2: logging.DEBUG}.get(verbose, logging.INFO)
-
-    logger = logging.getLogger('acisfp_check')
-    logger.setLevel(loglevel)
-
-    formatter = logging.Formatter('%(message)s')
-
-    console = logging.StreamHandler()
-    console.setFormatter(formatter)
-    console.setLevel(loglevel);
-    logger.addHandler(console)
-
-    filehandler = logging.FileHandler(
-        filename=os.path.join(outdir, 'run.dat'), mode='w')
-    filehandler.setFormatter(formatter)
-
-    # Set the file loglevel to be at least INFO,
-    # but override to DEBUG if that is requested at the
-    # command line
-    filehandler.setLevel(logging.INFO)
-    if loglevel == logging.DEBUG:
-        filehandler.setLevel(logging.DEBUG)
-
-    logger.addHandler(filehandler)
-
-
-#------------------------------------------------------------------------------
-#
-#   write_states
-#
-#------------------------------------------------------------------------------
-def write_states(opt, states):
-    """Write states recarray to file states.dat"""
-    outfile = os.path.join(opt.outdir, 'states.dat')
-    logger.info('Writing states to %s' % outfile)
-    out = open(outfile, 'w')
-    fmt = {'power': '%.1f',
-           'pitch': '%.2f',
-           'tstart': '%.2f',
-           'tstop': '%.2f',
-           }
-    newcols = list(states.dtype.names)
-    newcols.remove('T_acisfp')
-    newstates = np.rec.fromarrays([states[x] for x in newcols], names=newcols)
-    Ska.Numpy.pprint(newstates, fmt, out)
-    out.close()
-
-
-#------------------------------------------------------------------------------
-#
-#   write_temps
-#
-#------------------------------------------------------------------------------
-def write_temps(opt, times, temps):
-    """Write temperature predictions to file temperatures.dat"""
-    outfile = os.path.join(opt.outdir, 'temperatures.dat')
-    logger.info('Writing temperatures to %s' % outfile)
-    T_acisfp = temps['fptemp']
-    temp_recs = [(times[i], DateTime(times[i]).date, T_acisfp[i])
-                 for i in xrange(len(times))]
-    temp_array = np.rec.fromrecords(
-        temp_recs, names=('time', 'date', 'fptemp'))
-
-    fmt = {'fptemp': '%.2f',
-           'time': '%.2f'}
-    out = open(outfile, 'w')
-    Ska.Numpy.pprint(temp_array, fmt, out)
-    out.close()
-
 
 #------------------------------------------------------------------------------
 #
@@ -1174,55 +942,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
 
         ACIS_I_viols = search_obsids_for_viols(msid, plan_limit,ACIS_I_obs , temp, times)
 
-    return(ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols)
-
-#------------------------------------------------------------------------------
-#
-#   plot_two
-#
-#------------------------------------------------------------------------------
-def plot_two(fig_id, x, y, x2, y2,
-             linestyle='-', linestyle2='-',
-             color='blue', color2='magenta',
-             ylim=None, ylim2=None,
-             xlabel='', ylabel='', ylabel2='', title='',
-             figsize=(7, 3.5),
-             ):
-    """Plot two quantities with a date x-axis"""
-
-    xt = Ska.Matplotlib.cxctime2plotdate(x)
-    fig = plt.figure(fig_id, figsize=figsize)
-    fig.clf()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.plot_date(xt, y, fmt='-', linestyle=linestyle, color=color)
-
-
-    
-    ax.set_xlim(min(xt), max(xt))
-    if ylim:
-        ax.set_ylim(*ylim)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.grid()
-
-    ax2 = ax.twinx()
-
-    xt2 = Ska.Matplotlib.cxctime2plotdate(x2)
-    ax2.plot_date(xt2, y2, fmt='-', linestyle=linestyle2, color=color2)
-    ax2.set_xlim(min(xt), max(xt))
-    if ylim2:
-        ax2.set_ylim(*ylim2)
-    ax2.set_ylabel(ylabel2, color=color2)
-    ax2.xaxis.set_visible(False)
-
-    Ska.Matplotlib.set_time_ticks(ax)
-    [label.set_rotation(30) for label in ax.xaxis.get_ticklabels()]
-    [label.set_color(color2) for label in ax2.yaxis.get_ticklabels()]
-
-    fig.subplots_adjust(bottom=0.22)
-
-    return {'fig': fig, 'ax': ax, 'ax2': ax2}
+    return ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols
 
 
 #----------------------------------------------------------------------
@@ -1690,43 +1410,6 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
 
 #------------------------------------------------------------------------------
 #
-#   get_states  
-#
-#------------------------------------------------------------------------------
-def get_states(datestart, datestop, db):
-    """Get states exactly covering date range
-
-    :param datestart: start date
-    :param datestop: stop date
-    :param db: database handle
-    :returns: np recarry of states
-    """
-    datestart = DateTime(datestart).date
-    datestop = DateTime(datestop).date
-    logger.info('Getting commanded states between %s - %s' %
-                 (datestart, datestop))
-
-    # Get all states that intersect specified date range
-    cmd = """SELECT * FROM cmd_states
-             WHERE datestop > '%s' AND datestart < '%s'
-             ORDER BY datestart""" % (datestart, datestop)
-    logger.debug('   Query command: %s' % cmd)
-    states = db.fetchall(cmd)
-    logger.info('   Found %d commanded states' % len(states))
-
-    # Set start and end state date/times to match telemetry span.  Extend the
-    # state durations by a small amount because of a precision issue converting
-    # to date and back to secs.  (The reference tstop could be just over the
-    # 0.001 precision of date and thus cause an out-of-bounds error when
-    # interpolating state values).
-    states[0].tstart = DateTime(datestart).secs - 0.01
-    states[0].datestart = DateTime(states[0].tstart).date
-    states[-1].tstop = DateTime(datestop).secs + 0.01
-    states[-1].datestop = DateTime(states[-1].tstop).date
-
-    return states
-#------------------------------------------------------------------------------
-#
 #   make_validation_plots
 #
 #------------------------------------------------------------------------------
@@ -1873,95 +1556,26 @@ def make_validation_plots(opt, tlm, db):
         f.close()
 
     return plots
-#------------------------------------------------------------------------------
-#
-#   plot_cxctime
-#
-#------------------------------------------------------------------------------
-def plot_cxctime(times, y, fig=None, **kwargs):
-    """Make a date plot where the X-axis values are in CXC time.  If no ``fig``
-    value is supplied then the current figure will be used (and created
-    automatically if needed).  Any additional keyword arguments
-    (e.g. ``fmt='b-'``) are passed through to the ``plot_date()`` function.
 
-    :param times: CXC time values for x-axis (date)
-    :param y: y values
-    :param fig: pyplot figure object (optional)
-    :param **kwargs: keyword args passed through to ``plot_date()``
-
-    :rtype: ticklocs, fig, ax = tick locations, figure, and axes object.
-    """
-    # if no Matplotlib figure has been supplied, use the current one or
-    # make a new one
-    if fig is None:
-        fig = plt.gcf()
-
-    # set ax to the current axes
-    ax = fig.gca()
-
-    # This importation should be moved to the top
-    import Ska.Matplotlib
-
-    # Plot yoru y value vs time
-    ax.plot_date(Ska.Matplotlib.cxctime2plotdate(times), y, **kwargs)
-
-    # Obviously this uses some sort of x tick mark labeler in the
-    # Ska environment but the author hasn't commented what it is or
-    # how it's used. i will backfil once I look at the function
-    ticklocs = Ska.Matplotlib.set_time_ticks(ax)
-    fig.autofmt_xdate()
-
-    return ticklocs, fig, ax
-
-
-
-
-
-
-#------------------------------------------------------------------------------
-#
-#   pointpair
-#
-#------------------------------------------------------------------------------
-def pointpair(x, y=None):
-    """
-    I have no idea what this function does because it isn't commented
-    and I haven't had the time to try and figure it out from the code
-    """
-    if y is None:
-        y = x
-    return np.array([x, y]).reshape(-1, order='F')
-
-
-#------------------------------------------------------------------------------
-#
-#   globfile
-#
-#------------------------------------------------------------------------------
-def globfile(pathglob):
-    """Return the one file name matching ``pathglob``.  Zero or multiple
-    matches raises an IOError exception."""
-
-    files = glob.glob(pathglob)
-    if len(files) == 0:
-        raise IOError('No files matching %s' % pathglob)
-    elif len(files) > 1:
-        raise IOError('Multiple files matching %s' % pathglob)
-    else:
-        return files[0]
-
-
-if __name__ == '__main__':
-    opt, args = get_options()
-    if opt.version:
-        print VERSION
-        sys.exit(0)
-
+def main():
+    opts = [("fps_nopref", 
+             {"default": "/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt",
+              "help": "Full path to the FP sensitive nopref file"})]
+    args = get_options("acisfp", model_path, opts=opts)
+    state_builder = make_state_builder(args.state_builder, args)
+    acisfp_check = ACISFPModelCheck("fptemp", "acisfp", MSID, YELLOW,
+                                    MARGIN, VALIDATION_LIMITS,
+                                    HIST_LIMIT, calc_model,
+                                    other_telem=['1dahtbon'],
+                                    other_map={'1dahtbon': 'dh_heater'})
     try:
-        main(opt)
-    except Exception, msg:
-        if opt.traceback:
+        acisfp_check.driver(args, state_builder)
+    except Exception as msg:
+        if args.traceback:
             raise
         else:
-            print "ERROR:", msg
+            print("ERROR:", msg)
             sys.exit(1)
+
+if __name__ == '__main__':
+    main()
