@@ -164,7 +164,7 @@ class ObsidFindFilter():
         """
         # convert begin and end into sybase query tstart and tstop
         tstart = DateTime(tbegin)
-        tstop =   DateTime(tend)
+        tstop = DateTime(tend)
         #
         #form the query for everything, starting from tstart date to now
         #
@@ -175,7 +175,7 @@ class ObsidFindFilter():
         aca_read_db = DBI(dbi='sybase', server='sybase', user='aca_read', database='aca') 
 
         #  Fetch all the data
-        self.cmd_states = aca_read_db.fetchall( query )
+        self.cmd_states = aca_read_db.fetchall(query)
  
         return self.cmd_states
 
@@ -185,7 +185,7 @@ class ObsidFindFilter():
     # find_obsid_intervals
     #                                
     #---------------------------------------------------------------------
-    def find_obsid_intervals(self, cmd_states, outfilespec = None):
+    def find_obsid_intervals(self, cmd_states, outfilespec=None):
         """
         User reads the SKA commanded states archive, via 
         a call to the SKA get_cmd_states, between the
@@ -264,7 +264,7 @@ class ObsidFindFilter():
         #
         # Some inits
         #
-        min_exptime = 30000
+        min_exptime = 30000.0
 
         # Open the output file, and write out a header
         if outfilespec != None:
@@ -433,7 +433,7 @@ class ObsidFindFilter():
                cmd_states = cmd_statesFetch(start_time, stop_time)
                OBSIDIntervals = FindObsidIntervals(cmd_states, '')
      
-          expintervals = ExpTimeFilter(OBSIDIntervals, [min_exp_length, <max_exp_length>])
+        expintervals = ExpTimeFilter(OBSIDIntervals, [min_exp_length, <max_exp_length>])
         """
         exptimelist = []
 
@@ -447,8 +447,7 @@ class ObsidFindFilter():
             max_exp_length = startstoplist[1]
 
         for eachinterval in obsidinterval_list:
-            if (eachinterval[self.exptime] >= min_exp_length) and \
-               (eachinterval[self.exptime] <= max_exp_length):
+            if max_exp_length >= eachinterval[self.exptime] >= min_exp_length:
                 exptimelist.append(eachinterval)
 
         return exptimelist
@@ -538,7 +537,7 @@ class ObsidFindFilter():
             maxpitch = pitchrangelist[1]
 
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.pitch] >= minpitch and eachinterval[self.pitch] < maxpitch:
+            if maxpitch > eachinterval[self.pitch] >= minpitch:
                 pitchlist.append(eachinterval)
 
         return pitchlist
@@ -589,7 +588,7 @@ class ObsidFindFilter():
            maxcount = ccdcountrangelist[1]
 
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.ccd_count] >= mincount and eachinterval[self.ccd_count] <= maxcount:
+            if maxcount >= eachinterval[self.ccd_count] >= mincount:
                 ccdcountlist.append(eachinterval)
 
         return ccdcountlist
@@ -649,8 +648,8 @@ class ObsidFindFilter():
         """
         fp_only = []
         for eachobservation in obsidinterval_list:
-            if  (len(eachobservation) >= self.is_fp_sensitive) and \
-                (eachobservation[self.is_fp_sensitive] == True):
+            if len(eachobservation) >= self.is_fp_sensitive and \
+                eachobservation[self.is_fp_sensitive]:
                 fp_only.append(eachobservation)
         return fp_only
 
@@ -737,8 +736,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        ccd_count = observation[self.ccd_count]
-        return ccd_count
+        return observation[self.ccd_count]
 
     #----------------------------------------------------------------------
     #
@@ -750,8 +748,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        datestart = observation[self.datestart]
-        return datestart
+        return observation[self.datestart]
 
     #----------------------------------------------------------------------
     #
@@ -763,8 +760,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        datestop = observation[self.datestop]
-        return datestop
+        return observation[self.datestop]
 
     #----------------------------------------------------------------------
     #
@@ -776,8 +772,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        exptime = observation[self.exptime]
-        return exptime
+        return observation[self.exptime]
 
     #----------------------------------------------------------------------
     #
@@ -789,8 +784,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        instrument = observation[self.in_focal_plane]
-        return instrument
+        return observation[self.in_focal_plane]
 
     #----------------------------------------------------------------------
     #
@@ -821,7 +815,6 @@ class ObsidFindFilter():
         for eachobs in observations:
             if eachobs[self.in_focal_plane] == instrument:
                 same_inst.append(eachobs)
-
         return same_inst
 
 
@@ -836,10 +829,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it.
         NOTE: type(obsid) = int!!!
         """
-        obsid = None
-        if observation != []:
-            obsid = observation[self.obsid]
-        return obsid
+        return observation[self.obsid] if len(observation) > 0 else None
 
 
     #----------------------------------------------------------------------
@@ -868,8 +858,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        pitch = observation[self.pitch]
-        return pitch
+        return observation[self.pitch]
 
 
     #----------------------------------------------------------------------
@@ -882,8 +871,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the sim position and return it
         """
-        sensitivity = observation[self.is_fp_sensitive]
-        return sensitivity
+        return observation[self.is_fp_sensitive]
 
 
     #----------------------------------------------------------------------
@@ -896,8 +884,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the sim position and return it
         """
-        sim_position = observation[self.simpos]
-        return sim_position
+        return observation[self.simpos]
 
     #----------------------------------------------------------------------
     #
@@ -909,8 +896,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the tstart and return it
         """
-        obs_tstart = observation[self.tstart]
-        return obs_tstart
+        return observation[self.tstart]
 
     #----------------------------------------------------------------------
     #
@@ -922,8 +908,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the tstop and return it
         """
-        obs_tstop = observation[self.tstop]
-        return obs_tstop
+        return observation[self.tstop]
 
 
     #----------------------------------------------------------------------
