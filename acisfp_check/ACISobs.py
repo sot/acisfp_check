@@ -940,7 +940,7 @@ class ObsidFindFilter():
         si_mode_list = []
         for each_observation in observation_list:
             si_mode_list.append(each_observation[self.obsid])
-        return(si_mode_list)
+        return si_mode_list
 
     ######################################################################
     #
@@ -966,10 +966,6 @@ class ObsidFindFilter():
         instrument
         
         """
-        if(instrument == "ACIS-I") or \
-          (instrument == "ACIS-S") or \
-          (instrument == "HRC-I") or \
-          (instrument == "HRC-S"):
-
+        if instrument in ["ACIS-I", "ACIS-S", "HRC-I", "HRC-S"]:
             observation[self.in_focal_plane] = instrument
-        return()
+        return
