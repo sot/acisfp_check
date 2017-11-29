@@ -181,6 +181,106 @@ class ACISFPModelCheck(ACISThermalCheck):
                                T_acisfp_times=None, dh_heater=dh_heater, 
                                dh_heater_times=dh_heater_times)
 
+    def make_prediction_plots(self, outdir, states, times, temps, load_start):
+        # This is a no-op because we have a different function to handle 
+        # plotting
+        return None
+
+    def make_prediction_viols(self, times, temps, load_start):
+        # This is a no-op because we have a different function to handle 
+        # violations
+        return None
+
+    def make_week_predict(self, tstart, tstop, tlm, T_init, model_spec,
+                          outdir):
+        # The first step is to build a list of all the perigee passages.
+        # We will get those from the relevant CRM pad time file 
+        # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
+        # Each line is either an inbound  or outbound CTI
+        #
+        # The reason we are doing this is because we want to draw vertical 
+        # lines denoting each perigee passage on the plots
+        #
+        # Open the file
+        crm_file_path = glob.glob(self.bsdir + "/*CRM*")[0]
+        crm_file = open(crm_file_path, 'r')
+
+        alines = crm_file.readlines()
+        
+        idx = None
+        # Keep reading until you hit the last header line which is all "*"'s
+        for i, aline in enumerate(alines):
+            if len(aline) > 0 and aline[0] == "*":
+                idx = i+1
+                break
+
+        if idx is None:
+            raise RuntimeError("Couldn't find the end of the CRM Pad Time file header!")
+
+        # Found the last line of the header. Start processing Perigee Passages
+        # initialize the resultant Perigee Passage list to empty
+        # This is the product of this section of code.
+        perigee_passages = []
+
+        # While there are still lines to be read
+        for aline in alines[idx:]:
+            # create an empty Peri. Passage instance location
+            passage = []
+
+            # split the CRM Pad Time file line read in and extract the 
+            # relevant information
+            splitline = aline.split()
+            passage.append(splitline[0])  # Event Type (EEF or XEF)
+            passage.append(splitline[6])  # CTI Start time
+            passage.append(splitline[7])  # CTI Stop time
+            passage.append(splitline[9])  # Perigee Passage time
+
+            # append this passage to the passages list
+            perigee_passages.append(passage)
+
+        # Done with the CRM Pad Time file - close it
+        crm_file.close()
+
+        # Read in the FP Sensitive Nopref file and form nopref array from it.
+        nopref_array = process_nopref_list(self.fps_nopref)
+
+        # Now we call the ACISThermalCheck version of make_week_predict
+        pred = super(ACISFPModelCheck, self).make_week_predict(tstart, tstop, 
+                                                               tlm, T_init, 
+                                                               model_spec,
+                                                               outdir)
+
+        #------------------------
+        #
+        #  call make_check_plots
+        #
+        #-------------------------
+        #
+        # obs_with_sensitivity contains all ACIS and all CTI observations 
+        # and has had the sensitivity boolean added.
+        plots, obs_with_sensitivity = make_check_plots(opt, states, model.times, 
+                                                       temps, tstart, perigee_passages, 
+                                                       nopref_array)
+    
+        #-------------------
+        #
+        #  call make_viols
+        #
+        #-------------------
+        ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols = make_viols(opt, states, 
+                                                                          model.times, 
+                                                                          temps, 
+                                                                          obs_with_sensitivity, 
+                                                                          nopref_array)
+    
+        return dict(opt=opt, states=states, times=model.times, temps=temps,
+                    plots=plots, cti_viols=cti_viols, ACIS_I_viols=ACIS_I_viols, 
+                    ACIS_S_viols = ACIS_S_viols, fp_sens_viols=fp_sens_viols)
+
+    def driver(self, args, state_builder):
+        self.fps_nopref = args.fps_nopref
+        super(ACISFPModelCheck, self).driver(args, state_builder)
+
 ###############################################################################
 #
 #   MAIN
@@ -198,98 +298,6 @@ command line options.  Main calls are: get_bs_cmds
 """
 def main(opt):
 
-    if not os.path.exists(opt.outdir):
-        os.mkdir(opt.outdir)
-
-    config_logging(opt.outdir, opt.verbose)
-
-    # Store info relevant to processing for use in outputs
-    # FP_TEMP limits set in globals above.
-    # ctime is the present time
-
-    proc = dict(run_user=os.environ['USER'],
-                run_time=time.ctime(),
-                errors=[],
-                )
-
-    logger.info('##############################'
-                '#######################################')
-    logger.info('# acisfp_check.py run at %s by %s'
-                % (proc['run_time'], proc['run_user']))
-    logger.info('# acisfp_check version = {}'.format(VERSION))
-    logger.info('# model_spec file = %s' % os.path.abspath(opt.model_spec))
-    logger.info('# Focal Plane Sensitivity NoPref file Path: %s', opt.fps_nopref)
-    logger.info('###############################'
-                '######################################\n')
-
-    logger.info('Command line options:\n%s\n' % pformat(opt.__dict__))
-
-    # Connect to the SKA.DBI database (NEED TO USE aca_read)
-    logger.info('Connecting to SKA DBI database to get cmd_states')
-    db = Ska.DBI.DBI(dbi='sybase', server='sybase', user='aca_read',
-                     database='aca')
-
-    tnow = DateTime(opt.run_start).secs
-
-
-    #
-    # GET_BS_CMDS 
-    # If you have an ofls directory, get tstart, tstop, 
-    # and the commands from the backstop file in that directory.  
-    # Note that tstart and tstop are taken from the first and last 
-    # element in the list. This DOES NOT necessarily coincide with the 
-    # 
-    if opt.oflsdir is not None:
-        # Get tstart, tstop, commands from backstop file in opt.oflsdir
-        #------------
-        # GET_BS_CMDS - Get the backstop file commands for this week
-        #------------
-        logger.info('\nObtaining the commands from the prediction load backstop file')
-        bs_cmds = get_bs_cmds(opt.oflsdir)
-        tstart = bs_cmds[0]['time']
-        tstop = bs_cmds[-1]['time']
-
-        logger.info('   BACSTOP FILE TSTART is: %s' % DateTime(tstart).date)
-        logger.info('   BACSTOP FILE TSTOP is:  %s\n' % DateTime(tstop).date)
-
-        proc.update(dict(datestart=DateTime(tstart).date,
-                         datestop=DateTime(tstop).date))
-    else:
-        tstart = tnow
-
-
-    #------------------
-    # GET_TELEM_VALUES Get temperature telemetry for 3 weeks prior to 
-    #                  min(tstart, NOW)    
-    #-----------------
-    # Fetch the telemetry data for the specified MSID's. Note that the 
-    # undocumented purpose of name_map is to allow the user to set a 
-    # numpy structured array column header to a user specified value RATHER
-    # than the original msid name.
-    # Changed 10/2015
-    tlm = get_telem_values(min(tstart, tnow),
-                           ['fptemp_11',
-                            'sim_z',                # dpa json
-                            'aosares1',
-                            'dp_dpa_power','1dahtbon'],
-                           days=opt.days,
-                           name_map={'sim_z': 'tscpos',
-                                     'aosares1': 'pitch',
-                                     'fptemp_11': 'fptemp',
-                                     '1dahtbon': 'dh_heater'})
-
-    # Convert the returned SIM position to the numbers used by
-    # us ( as in -99616. for HRC-S)
-    tlm['tscpos'] = tlm['tscpos'] * -397.7225924607
-
-    #------------------
-    # MAKE_WEEK_PREDICT - make predictions on oflsdir if defined
-    #------------------
-    # 
-    if opt.oflsdir is not None:
-        pred = make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db)
-    else:
-        pred = dict(plots=None, ACIS_I_viols=None, ACIS_S_viols=None, cti_viols=None, fp_sens_viols=None, times=None, states=None, temps=None)
 
     #----------------------
     # MAKE_VALIDATION_PLOTS
@@ -324,8 +332,6 @@ def main(opt):
                     ACIS_S_viols=pred['ACIS_S_viols'], 
                     fp_sens_viols=pred['fp_sens_viols'],
                     cti_viols = pred['cti_viols'])
-
-    rst_to_html(opt, proc)
 
     print "ALL DONE!"
     return dict(opt=opt, states=pred['states'], times=pred['times'],
