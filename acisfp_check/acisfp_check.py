@@ -739,7 +739,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
              - cti_viols
   
     """
-    logger.info('\nMAKE VIOLS Checking for limit violations in '+str(len(states))+' states and\n '+ str(len(obs_with_sensitivity))+ " total science observations")
+    mylog.info('\nMAKE VIOLS Checking for limit violations in '+str(len(states))+' states and\n '+ str(len(obs_with_sensitivity))+ " total science observations")
 
 #    viols = dict((x, []) for x in MSID)
 
@@ -778,7 +778,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         #------------------------------------
         #  CTI-ONLY, -118.7 violation check
         #------------------------------------
-        logger.info('\n\nCTI ONLY -118.7 FP SENSE violations')
+        mylog.info('\n\nCTI ONLY -118.7 FP SENSE violations')
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
@@ -789,7 +789,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         #  FP TEMP sensitive observations; -118.7 violation check
         #     These are not load killers
         #------------------------------------------------------------
-        logger.info('\n\nFP SENSITIVE SCIENCE ONLY -118.7 violations')
+        mylog.info('\n\nFP SENSITIVE SCIENCE ONLY -118.7 violations')
         # Set the limit for  Thos eObservations that are sensitive to the FP Temp
         plan_limit = FP_TEMP_SENSITIVE[msid]
 
@@ -801,7 +801,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         #  These are load killers
         #--------------------------------------------------------------
         # 
-        logger.info('\n\n-112 ACIS-S SCIENCE ONLY violations')
+        mylog.info('\n\n-112 ACIS-S SCIENCE ONLY violations')
         # Set the limit 
         plan_limit = ACIS_S_RED[msid]
         ACIS_S_viols = search_obsids_for_viols(msid,  plan_limit, ACIS_S_obs, temp, times)
@@ -811,7 +811,7 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         #  These are load killers
         #--------------------------------------------------------------
         # 
-        logger.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
+        mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
         # Create the violation data structure.
         ACIS_I_viols = dict((x, []) for x in MSID)
 
@@ -1165,7 +1165,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
         # Build the file name and output the plot to a file
         filename = MSID[msid].lower() + 'M120toM90.png'
         outfile = os.path.join(opt.outdir, filename)
-        logger.info('   Writing plot file %s' % outfile)
+        mylog.info('Writing plot file %s' % outfile)
         plots[msid]['fig'].savefig(outfile)
         plots[msid]['filename'] = filename
 
@@ -1207,7 +1207,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
         # Build the file name and output the file
         filename = MSID[msid].lower() + 'M120toM119.png'
         outfile = os.path.join(opt.outdir, filename)
-        logger.info('   Writing plot file %s' % outfile)
+        mylog.info('   Writing plot file %s' % outfile)
         plots[msid]['fig'].savefig(outfile)
         plots[msid]['filename'] = filename
 
@@ -1255,7 +1255,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
         # Build the file name and output the file
         filename = MSID[msid].lower() + 'M120toM112.png'
         outfile = os.path.join(opt.outdir, filename)
-        logger.info('   Writing plot file %s' % outfile)
+        mylog.info('   Writing plot file %s' % outfile)
         plots[msid]['fig'].savefig(outfile)
         plots[msid]['filename'] = filename
 
@@ -1280,7 +1280,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
     plots['pow_sim']['fig'].subplots_adjust(right=0.85)
     filename = 'pow_sim.png'
     outfile = os.path.join(opt.outdir, filename)
-    logger.info('   Writing plot file %s' % outfile)
+    mylog.info('   Writing plot file %s' % outfile)
     plots['pow_sim']['fig'].savefig(outfile)
     plots['pow_sim']['filename'] = filename
 
@@ -1312,7 +1312,7 @@ def make_validation_plots(opt, tlm, db):
     states = get_states(start, stop, db)
 
     # Create array of times at which to calculate FP temperatures, then do it
-    logger.info('\nCalculating Focal Plane thermal model for validation')
+    mylog.info('\nCalculating Focal Plane thermal model for validation')
 
     model = calc_model(opt.model_spec, states, start, stop)
 
@@ -1351,7 +1351,7 @@ def make_validation_plots(opt, tlm, db):
 
 
     plots = []
-    logger.info('   Making FPTEMP model validation plots and quantile table')
+    mylog.info('   Making FPTEMP model validation plots and quantile table')
     quantiles = (1, 5, 16, 50, 84, 95, 99)
     # store lines of quantile table in a string and write out later
     quant_table = ''
@@ -1378,7 +1378,7 @@ def make_validation_plots(opt, tlm, db):
         ax.grid()
         filename = msid + '_valid.png'
         outfile = os.path.join(outdir, filename)
-        logger.info('   Writing plot file %s' % outfile)
+        mylog.info('   Writing plot file %s' % outfile)
         fig.savefig(outfile)
         plot['lines'] = filename
 
@@ -1411,14 +1411,14 @@ def make_validation_plots(opt, tlm, db):
             fig.subplots_adjust(bottom=0.18)
             filename = '%s_valid_hist_%s.png' % (msid, histscale)
             outfile = os.path.join(outdir, filename)
-            logger.info('   Writing plot file %s' % outfile)
+            mylog.info('   Writing plot file %s' % outfile)
             fig.savefig(outfile)
             plot['hist' + histscale] = filename
 
         plots.append(plot)
 
     filename = os.path.join(outdir, 'validation_quant.csv')
-    logger.info('   Writing quantile table %s' % filename)
+    mylog.info('   Writing quantile table %s' % filename)
     f = open(filename, 'w')
     f.write(quant_table)
     f.close()
@@ -1428,7 +1428,7 @@ def make_validation_plots(opt, tlm, db):
     # telemetered dataset as a pickle.
     if opt.run_start:
         filename = os.path.join(outdir, 'validation_data.pkl')
-        logger.info('   Writing validation data %s' % filename)
+        mylog.info('   Writing validation data %s' % filename)
         f = open(filename, 'w')
         pickle.dump({'pred': pred, 'tlm': tlm}, f, protocol=-1)
         f.close()
