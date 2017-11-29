@@ -316,9 +316,9 @@ def main(opt):
         daymatch = re.match('.*(\d{4})/(\d{3})', opt.outdir)
         if opt.oflsdir is None and daymatch:
             url = os.path.join(URL, daymatch.group(1), daymatch.group(2))
-            logger.info('validation warning(s) at %s' % url)
+            mylog.info('validation warning(s) at %s' % url)
         else:
-            logger.info('validation warning(s) in output at %s' % opt.outdir)
+            mylog.info('validation warning(s) in output at %s' % opt.outdir)
 
     #------------------
     # WRITE INDEX RST
@@ -468,14 +468,14 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
     if state0['T_acisfp'] < 15:
         state0['T_acisfp'] = 15.0
 
-    logger.debug('\n    MWP - state0 at %s is\n%s' % (DateTime(state0['tstart']).date,
+    mylog.debug('\n    MWP - state0 at %s is\n%s' % (DateTime(state0['tstart']).date,
                                            pformat(state0)))
 
     # Get commanded states after end of state0 through first backstop command time
     cmds_datestart = state0['datestop']
     cmds_datestop = bs_cmds[0]['date']
 
-    logger.info("    \n    fetchall date start and stop: %s %s " %(cmds_datestart, cmds_datestop))
+    mylog.info("    \n    fetchall date start and stop: %s %s " %(cmds_datestart, cmds_datestop))
 
     # Get timeline load segments including state0 and beyond.
     timeline_loads = db.fetchall("""SELECT * from timeline_loads
@@ -483,7 +483,7 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
                                  and datestart < '%s'"""
                                  % (cmds_datestart, cmds_datestop))
 
-    logger.info('    Found {} timeline_loads  after {}'.format(
+    mylog.info('    Found {} timeline_loads  after {}'.format(
                 len(timeline_loads), cmds_datestart))
 
     # Get cmds since datestart within timeline_loads
@@ -496,7 +496,7 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
                                       x['time'] < bs_cmds[0]['time'])]
 
 
-    logger.info('    Got %d cmds from database between %s and %s' %
+    mylog.info('    Got %d cmds from database between %s and %s' %
                   (len(db_cmds), cmds_datestart, cmds_datestop))
 
     # Get the commanded states from state0 through the end of backstop commands
@@ -506,12 +506,12 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
     states[-1].tstop = bs_cmds[-1]['time']
 
 
-    logger.info('    Found %d commanded states from %s to %s' %
+    mylog.info('    Found %d commanded states from %s to %s' %
                  (len(states), states[0]['datestart'], states[-1]['datestop']))
 
     # October 2015 - DH Heater addition
     htrbfn='dahtbon_history.rdb'
-    logger.info('    Reading file of dahtrb commands from file %s' % htrbfn)
+    mylog.info('    Reading file of dahtrb commands from file %s' % htrbfn)
     htrb=Ska.Table.read_ascii_table(htrbfn,headerrow=2,headertype='rdb')
     dh_heater_times=date2secs(htrb['time'])
 
@@ -553,134 +553,6 @@ def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
 
     return dict(opt=opt, states=states, times=model.times, temps=temps,
                plots=plots, cti_viols=cti_viols, ACIS_I_viols=ACIS_I_viols, ACIS_S_viols = ACIS_S_viols, fp_sens_viols=fp_sens_viols)
-#------------------------------------------------------------------------------
-#
-#   make_validation_viols
-#
-#------------------------------------------------------------------------------
-def make_validation_viols(plots_validation):
-    """
-    Find limit violations where MSID quantile values are outside the
-    allowed range.
-    """
-    logger.info('\nChecking for validation violations')
-
-    viols = []
-
-    for plot in plots_validation:
-        # 'plot' is actually a structure with plot info and stats about the
-        #  plotted data for a particular MSID.  'msid' can be a real MSID
-        #  (1DPAMZT) or pseudo like 'POWER'
-        msid = plot['msid']
-
-        # Make sure validation limits exist for this MSID
-        if msid not in VALIDATION_LIMITS:
-            continue
-
-        # Cycle through defined quantiles (e.g. 99 for 99%) and corresponding
-        # limit values for this MSID.
-        for quantile, limit in VALIDATION_LIMITS[msid]:
-            # Get the quantile statistic as calculated when making plots
-            msid_quantile_value = float(plot['quant%02d' % quantile])
-
-            # Check for a violation and take appropriate action
-            if abs(msid_quantile_value) > limit:
-                viol = {'msid': msid,
-                        'value': msid_quantile_value,
-                        'limit': limit,
-                        'quant': quantile,
-                        }
-                viols.append(viol)
-                logger.info('   WARNING: %s %d%% quantile value of %s exceeds '
-                            'limit of %.2f' %
-                            (msid, quantile, msid_quantile_value, limit))
-
-    return viols
-
-#------------------------------------------------------------------------------
-#
-#   get_telem_values
-#
-#------------------------------------------------------------------------------
-def get_telem_values(tstart, msids, days=14, name_map={}):
-    """
-    Given: tstart: start time for telemetry (secs)
-           msids: fetch msids list
-           days: length of telemetry request before ``tstart``
-           dt: sample time (secs)
-           name_map: dict mapping msid to recarray col name
-
-    NOTE: that the undocumented purpose of name_map is to allow the 
-          user to set a numpy structured array column header to 
-          a user specified value RATHER than the original msid name.
-          Not every msid needs to have a mapped name.
-
-    Fetch last ``days`` of available ``msids`` telemetry values before
-    time ``tstart``.
-
-    :returns: np recarray of requested telemetry values from fetch
-     
-    Using the list of msid's in msid, fetch the data from the telemetry db
-    in an fetch.MSIDset call.
-    """
-    tstart = DateTime(tstart).secs
-
-    #Calculate the days PRIOR to tstart to use for the start time in
-    # the fetch.MSID call
-    start = DateTime(tstart - days * 86400).date
-    stop = DateTime(tstart).date
-    logger.info('\nFetching telemetry between %s and %s' % (start, stop))
-
-    # msidset is the results of a fetch.MSID set on the "msid's" list
-    # of items to get from telemetry. It is an array, containing one list
-    # which contains one Ska.engarchive.fetch.MSID object for each 
-    # msid. e.g. 
-    # MSIDset([('1dpamzt', <Ska.engarchive.fetch.MSID object at 0x84fc3d0>),
-    #          ('fptemp_11', <Ska.engarchive.fetch.MSID object at 0x7051450>),
-    #          ..........])
-    #  
-    #    each msid object containing "times" and "vals" just like any other
-    #      e.g.  msidset['1dpamzt'].times
-
-    msidset = fetch.MSIDset(msids, start, stop, stat='5min')
-    start = max(x.times[0] for x in msidset.values())
-    stop = min(x.times[-1] for x in msidset.values())
-    msidset.interpolate(328.0, start, stop + 1)  # 328 for '5min' stat
-
-    # Finished when we found at least 4 good records (20 mins)
-    if len(msidset.times) < 4:
-        raise ValueError('   Found no telemetry within %d days of %s'
-                         % (days, str(tstart)))
-
-    # x is each element in the msid list, 
-    # name_map.get(x, x) returns name_map y contents for that key OR,
-    # the x value itself if it is not a key in the dictionary    
-    # So for example, msids has "fptemp_11"; name_map maps that to
-    # "fptemp". So either the original msids name goes into outnames,
-    # Or the name mapped to the msid name in name_map.
-    #
-    # outnames is a list of the values - used as headers for the array
-    outnames = ['date'] + [name_map.get(x, x) for x in msids]
-
-    # vals is a dictionary whose keys are either the original msid name OR
-    # the name the user decided to map it to in name_map
-    # and whose values are the list of each fetch results for that msid
-    #    =      keys:             the values
-    vals = {name_map.get(x, x): msidset[x].vals for x in msids}
-    #   e.g. vals['pitch']
-   
-    # Now add a date column by taking the times out of msidset, and 
-    # appending as a n array whose dictionary key is "date"
-    vals['date'] = msidset.times
-
-
-    # Now turn vals into a structured array, and use outnames 
-    # column headers.
-    #
-    # NOTE: at this point, outnames and vals keys are the same list
-    out = Ska.Numpy.structured_array(vals, colnames=outnames)
-
-    return out
 
 #------------------------------------------------------------------------------
 #
@@ -716,7 +588,7 @@ def write_index_rst(opt,
         print msg
 
     outfile = os.path.join(opt.outdir, 'index.rst')
-    logger.info('Writing report file %s' % outfile)
+    mylog.info('Writing report file %s' % outfile)
 
     # Right now, the method to get the fptemp plot of interest 
     # (fptempM120toM114.png) to be the main interest is pretty kludgy. 
@@ -818,7 +690,7 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
             # .........and then add it to the violations list
             viols_list[msid].append(viol)
 
-            logger.info('   VIOLATION: %s  exceeds planning limit of %.2f '
+            mylog.info('   VIOLATION: %s  exceeds planning limit of %.2f '
                         'degC from %s to %s'
                         % (MSID[msid], plan_limit, viol['datestart'],
                         viol['datestop']))
