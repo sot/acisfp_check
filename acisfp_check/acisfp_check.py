@@ -245,10 +245,9 @@ class ACISFPCheck(ACISThermalCheck):
         nopref_array = process_nopref_list(self.fps_nopref)
 
         # Now we call the ACISThermalCheck version of make_week_predict
-        pred = super(ACISFPModelCheck, self).make_week_predict(tstart, tstop, 
-                                                               tlm, T_init, 
-                                                               model_spec,
-                                                               outdir)
+        pred = super(ACISFPCheck, self).make_week_predict(tstart, tstop, 
+                                                          tlm, T_init, 
+                                                          model_spec, outdir)
 
         #------------------------
         #
