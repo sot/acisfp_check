@@ -163,7 +163,7 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=No
 
     return model
 
-class ACISFPModelCheck(ACISThermalCheck):
+class ACISFPCheck(ACISThermalCheck):
 
     def calc_model_wrapper(self, model_spec, states, tstart, tstop, state0=None):
         if state0 is None:
@@ -1437,16 +1437,15 @@ def make_validation_plots(opt, tlm, db):
 
 def main():
     opts = [("fps_nopref", 
-             {"default": "/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt",
+             {"default": os.path.join(model_path, "FPS_NoPref.txt"),
               "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
     state_builder = make_state_builder(args.state_builder, args)
-    acisfp_check = ACISFPModelCheck("fptemp", "acisfp", MSID, YELLOW,
-                                    MARGIN, VALIDATION_LIMITS,
-                                    HIST_LIMIT, calc_model,
-                                    other_telem=['1dahtbon'],
-                                    other_map={'1dahtbon': 'dh_heater', 
-                                               "fptemp_11": "fp_temp"})
+    acisfp_check = ACISFPCheck("fptemp", "acisfp", MSID, YELLOW,
+                               MARGIN, VALIDATION_LIMITS, HIST_LIMIT, 
+                               calc_model, other_telem=['1dahtbon'],
+                               other_map={'1dahtbon': 'dh_heater', 
+                                          "fptemp_11": "fp_temp"})
     try:
         acisfp_check.driver(args, state_builder)
     except Exception as msg:
