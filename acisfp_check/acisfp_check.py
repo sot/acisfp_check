@@ -179,16 +179,6 @@ class ACISFPCheck(ACISThermalCheck):
                                T_acisfp_times=None, dh_heater=dh_heater, 
                                dh_heater_times=dh_heater_times)
 
-    def make_prediction_plots(self, outdir, states, times, temps, load_start):
-        # This is a no-op because we have a different function to handle 
-        # plotting
-        return None
-
-    def make_prediction_viols(self, times, temps, load_start):
-        # This is a no-op because we have a different function to handle 
-        # violations
-        return None
-
     def make_week_predict(self, tstart, tstop, tlm, T_init, model_spec,
                           outdir):
         # The first step is to build a list of all the perigee passages.
