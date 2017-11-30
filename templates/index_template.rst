@@ -17,8 +17,8 @@ Summary
 Date start            {{proc.datestart}}
 Date stop             {{proc.datestop}}
 FP_TEMP status        {%if ACIS_I_viols.fptemp or ACIS_S_viols.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
-{% if opt.loaddir %}
-Load directory        {{opt.loaddir}}
+{% if bsdir %}
+Load directory        {{bsdir}}
 {% endif %}
 Run time              {{proc.run_time}} by {{proc.run_user}}
 Run log               `<run.dat>`_

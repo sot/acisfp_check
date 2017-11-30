@@ -16,10 +16,9 @@ from __future__ import print_function
 # Use Agg backend for command-line (non-interactive) operation                                                                                                   
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 import glob
-import logging
-from pprint import pformat
 import re
 import pickle
 
@@ -28,8 +27,6 @@ import Ska.Table
 import Ska.Numpy
 import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime
-
-import Chandra.cmd_states as cmd_states
 
 from Chandra.Time import date2secs
 from astropy.io import ascii
@@ -51,6 +48,7 @@ import sys
 from acisfp_check.acis_obs import ObsidFindFilter
 
 model_path = os.path.abspath(os.path.dirname(__file__))
+default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 
 #
 # INIT
@@ -79,8 +77,8 @@ HIST_LIMIT = [-120.0]
 
 URL = "file:///home/gregg/git/xija/models/acisfp"
 
-def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=None, 
-               dh_heater=None, dh_heater_times=None):
+def calc_model(model_spec, states, start, stop, T_acisfp=None, 
+               T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
     """
     Create and run the Thermal Model for the Focal Plane temperature.
 
@@ -176,6 +174,9 @@ class ACISFPCheck(ACISThermalCheck):
 
     def make_week_predict(self, tstart, tstop, tlm, T_init, model_spec,
                           outdir):
+
+        mylog.info('Calculating %s thermal model' % self.name.upper())
+
         # The first step is to build a list of all the perigee passages.
         # We will get those from the relevant CRM pad time file 
         # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
@@ -227,380 +228,224 @@ class ACISFPCheck(ACISThermalCheck):
         # Read in the FP Sensitive Nopref file and form nopref array from it.
         nopref_array = process_nopref_list(self.fps_nopref)
 
-        # Now we call the ACISThermalCheck version of make_week_predict
-        pred = super(ACISFPCheck, self).make_week_predict(tstart, tstop, 
-                                                          tlm, T_init, 
-                                                          model_spec, outdir)
+        # Get commanded states and set initial temperature
+        states, state0 = self.get_states(tlm, T_init)
 
-        #------------------------
-        #
-        #  call make_check_plots
-        #
-        #-------------------------
-        #
+        # calc_model_wrapper actually does the model calculation by running
+        # model-specific code.
+        model = self.calc_model_wrapper(model_spec, states, state0['tstart'],
+                                        tstop, state0=state0)
+
+        # Make the limit check plots and data files
+        plt.rc("axes", labelsize=10, titlesize=12)
+        plt.rc("xtick", labelsize=10)
+        plt.rc("ytick", labelsize=10)
+        temps = {self.name: model.comp[self.msid].mvals}
+
         # obs_with_sensitivity contains all ACIS and all CTI observations 
         # and has had the sensitivity boolean added.
-        plots, obs_with_sensitivity = make_check_plots(opt, states, model.times, 
-                                                       temps, tstart, perigee_passages, 
+        plots, obs_with_sensitivity = make_check_plots(states, model.times, temps, 
+                                                       tstart, perigee_passages, 
                                                        nopref_array)
     
-        #-------------------
-        #
-        #  call make_viols
-        #
-        #-------------------
-        ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols = make_viols(opt, states, 
-                                                                          model.times, 
-                                                                          temps, 
-                                                                          obs_with_sensitivity, 
-                                                                          nopref_array)
-    
-        return dict(opt=opt, states=states, times=model.times, temps=temps,
-                    plots=plots, cti_viols=cti_viols, ACIS_I_viols=ACIS_I_viols, 
-                    ACIS_S_viols = ACIS_S_viols, fp_sens_viols=fp_sens_viols)
+        viols = self.make_viols(states, model.times, temps, obs_with_sensitivity, 
+                                nopref_array)
+
+        # write_states writes the commanded states to states.dat
+        self.write_states(outdir, states)
+        # write_temps writes the temperatures to temperatures.dat
+        self.write_temps(outdir, model.times, temps)
+
+        return dict(states=states, times=model.times, temps=temps,
+                    plots=plots, ACIS_I_viols=viols[0], ACIS_S_viols=viols[1],
+                    cti_viols=viols[2], fp_sens_viols=viols[3])
 
     def driver(self, args, state_builder):
+        """
+        The main interface to all of ACISFPCheck's functions.
+        This method must be called by the particular thermal model
+        implementation to actually run the code and make the webpage.
+
+        Parameters
+        ----------
+        args : ArgumentParser arguments
+            The command-line options object, which has the options
+            attached to it as attributes
+        state_builder : StateBuilder object
+            The StateBuilder object used to construct commanded states
+        """
+        self.state_builder = state_builder
         self.fps_nopref = args.fps_nopref
-        super(ACISFPModelCheck, self).driver(args, state_builder)
 
-###############################################################################
-#
-#   MAIN
-#
-###############################################################################
-"""
-Main execution routine - input is opt - which is the list of user-specified 
-command line options.  Main calls are: get_bs_cmds 
-                                       get_tlm_values
-                                       make_week_predict
-                                       make_validation_plots
-                                       make_validation_viols
-                                       write_index_rst
-                                       rst_to_html
-"""
-def main(opt):
+        proc = self._setup_proc_and_logger(args)
 
+        is_weekly_load = args.backstop_file is not None
+        tstart, tstop, tnow = self._determine_times(args.run_start,
+                                                    is_weekly_load)
 
-    #----------------------
-    # MAKE_VALIDATION_PLOTS
-    #----------------------
+        # Get the telemetry values which will be used
+        # for prediction and validation
+        tlm = self.get_telem_values(min(tstart, tnow), days=args.days)
 
-    plots_validation = make_validation_plots(opt, tlm, db)
-    
-    #----------------------
-    # MAKE_VALIDATION_VIOLS
-    #----------------------
-    valid_viols = make_validation_viols(plots_validation)
-
-    # if you found some violations....
-    if len(valid_viols) > 0:
-        # generate daily plot url if outdir in expected year/day format
-        daymatch = re.match('.*(\d{4})/(\d{3})', opt.outdir)
-        if opt.oflsdir is None and daymatch:
-            url = os.path.join(URL, daymatch.group(1), daymatch.group(2))
-            mylog.info('validation warning(s) at %s' % url)
+        # make predictions on a backstop file if defined
+        if args.backstop_file is not None:
+            pred = self.make_week_predict(tstart, tstop, tlm, args.T_init,
+                                          args.model_spec, args.outdir)
         else:
-            mylog.info('validation warning(s) in output at %s' % opt.outdir)
+            pred = defaultdict(lambda: None)
 
-    #------------------
-    # WRITE INDEX RST
-    #------------------
-    write_index_rst(opt, 
-                    proc, 
-                    plots_validation, 
-                    valid_viols=valid_viols,
-                    plots=pred['plots'], 
-                    ACIS_I_viols=pred['ACIS_I_viols'], 
-                    ACIS_S_viols=pred['ACIS_S_viols'], 
-                    fp_sens_viols=pred['fp_sens_viols'],
-                    cti_viols = pred['cti_viols'])
-
-    print "ALL DONE!"
-    return dict(opt=opt, states=pred['states'], times=pred['times'],
-                temps=pred['temps'], plots=pred['plots'],
-                ACIS_I_viols=pred['ACIS_I_viols'], 
-                ACIS_S_viols=pred['ACIS_S_viols'], 
-                cti_viols=pred['cti_viols'], 
-                fp_sens_viols=pred['fp_sens_viols'], 
-
-                proc=proc,
-                plots_validation=plots_validation)
-
+        plots_validation = make_validation_plots(opt, tlm, db)
     
+        valid_viols = make_validation_viols(plots_validation)
+    
+        # if you found some violations....
+        if len(valid_viols) > 0:
+            # generate daily plot url if outdir in expected year/day format
+            daymatch = re.match('.*(\d{4})/(\d{3})', args.outdir)
+            if self.bsdir is None and daymatch:
+                url = os.path.join(URL, daymatch.group(1), daymatch.group(2))
+                mylog.info('validation warning(s) at %s' % url)
+            else:
+                mylog.info('validation warning(s) in output at %s' % args.outdir)
 
+        # Write everything to the web page.
+        # First, write the reStructuredText file.
 
-#------------------------------------------------------------------------------
-#
-#   make_week_predict
-#
-#------------------------------------------------------------------------------
-def make_week_predict(opt, tstart, tstop, bs_cmds, tlm, db):
-    """
-    Given:  opt - the options entered by the user on the command
-                  line
-                  tstart - from bs_cmds[0]['time']
-		  tstop  - from bs_cmds[-1]['time']
-		  bs_cmds - output from get_bs_cmds
-		  tlm    - output from get_telem_values numpy structured array
-		  db     - Ska.DBI.DBI
-  
-      Find the start and end times that incorporate the initial state0 
-      calculated time, through the first backstop file time (if different)
-      and to the end of the backstop file. Get the commanded states from 
-      state0 through the end of backstop commands.
+        # Set up the context for the reST file
+        context = {'bsdir': self.bsdir,
+                   'plots': pred["plots"],
+                   'valid_viols': valid_viols,
+                   'proc': proc,
+                   'plots_validation': plots_validation,
+                   'ACIS_I_viols': pred["ACIS_I_viols"],
+                   'ACIS_S_viols': pred["ACIS_S_viols"],
+                   'fp_sens_viols': pred["fp_sens_viols"],
+                   'cti_viols': pred["cti_viols"]}
 
-    Return: A dictionary containing:
-            opt=opt, 
-            states=states, 
-            times=model.times, 
-            temps=temps,
-            plots=plots, 
-            viols=viols
+        self.write_index_rst(self.bsdir, args.outdir, context)
 
-    Calls: calc_model
-           make_check_plots
-           make_viols
-    """
-    #
-    # Ok the first step is to build a list of all the perigee passages.
-    # We will get those from the relevant CRM pad time file 
-    # (e.g. DO12143_CRM_Pad.txt) inside the opt.oflsdir directory
-    # Each line is either an inbound  or outbound CTI
-    #
-    # The reason we are doing this is because we want to draw vertical 
-    # lines denoting each perigee passage on the plots
-    #
-    # Open the file
-    crm_file_path = glob.glob(opt.oflsdir+"/*CRM*")[0]
-    crm_file = open(crm_file_path, 'r')
+        # Second, convert reST to HTML
+        self.rst_to_html(args.outdir, proc)
 
-    #read the first line. This is sure to be a header line
-    aline = crm_file.readline()
+        return
 
-    # Keep reading until you hit the last header line which is all "*"'s
-    while (len(aline) > 0) and (aline[0] != '*'):
-        aline = crm_file.readline()
+    def make_viols(self, states, times, temps, obs_with_sensitivity, nopref_array):
+        """
+        Find limit violations where predicted temperature is above the
+        red minus margin.
 
-    # Found the last line of the header. Start processing Perigee Passages
-    # initialize the resultant Perigee Passage list to empty
-    # This is the product of this section of code.
-    perigee_passages = []
+        MSID is a global 
 
-    #
-    # Get a Perigee Passage line
-    aline = crm_file.readline()
+        obs_with_sensitivity contains all ACIS and CTI observations 
+        and they have had FP sensitivity boolean added. In other words it's
+        All ACIS and ECS runs.
 
-    # While there are still lines to be read
-    while (aline):
-        # create an empty Peri. Passage instance location
-        passage = []
+        We will create a list of CTI-ONLY runs, and a list of all
+        ACIS science runs without CTI runs. These two lists will
+        be used to assess the categories of violations:
 
-        # split the CRM Pad Time file line read in and extract the 
-        #relevant information
-        splitline = aline.split()
-        passage.append(splitline[0])   #  Event Type (EEF or XEF)
-        passage.append(splitline[6])   #  CTI Start time
-        passage.append(splitline[7])   #  CTI Stop time
-        passage.append(splitline[9])   #  Perigee Passage time
+            1) Any ACIS-I observation that violates the -114 red limit 
+               is a violation and a load killer
+                 - science_viols
 
-        # append this passage to the passages list
-        perigee_passages.append(passage)
+            2) Any ACIS-S observation that violates the -112 red limit 
+               is a violation and a load killer
+                 - science_viols
 
-        # read the next line (if there is one
-        aline = crm_file.readline()
+            3) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7 
+               results in a "Preferences Not Met" indicator.
+                 - fp_sense_viols
 
-    # Done with the CRM Pad Time file - close it
-    crm_file.close()
+            3) Any CTI run that violates the -114 RED limit needs to be
+               tracked and is NOT a load killer
+                 - cti_viols
 
-    # Read in the FP Sensitive Nopref file and form nopref array from it.
-    nopref_array = process_nopref_list(opt.fps_nopref)
+        """
+        mylog.info('\nMAKE VIOLS Checking for limit violations in ' + 
+                   str(len(states)) + ' states and\n ' + 
+                   str(len(obs_with_sensitivity)) + 
+                   " total science observations")
 
-    # Make initial state0 from cmd line options. The CL options all 
-    # have defaults.
-    # NOTE - a state looks like one of the entries in TA's states.dat file
-    state0 = dict((x, getattr(opt, x)) for x in ('pitch', 'simpos', 'ccd_count', 'fep_count',
-                                                 'vid_board', 'clocking', 'T_acisfp', 'dh_heater'))
+        # create an instance of ObsidFindFilter()
+        eandf = ObsidFindFilter()
 
-    # Populate the state with info from the input paramters like tstart
-    # and some defaults (e.g. quarternions)
-    state0.update({'tstart': tstart - 30,
-                   'tstop': tstart,
-                   'datestart': DateTime(tstart - 30).date,
-                   'datestop': DateTime(tstart).date,
-                   'q1': 0.0, 'q2': 0.0, 'q3': 0.0, 'q4': 1.0,
-                   }
-                  )
+        # ------------------------------------------------------
+        #   Create subsets of all the observations
+        # ------------------------------------------------------
+        # Just the CTI runs
+        cti_only_obs = eandf.cti_only_filter(obs_with_sensitivity)
+        # Now divide out observations by ACIS-S and ACIS-I
+        ACIS_S_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-S")
+        ACIS_I_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-I")
 
-    # If cmd lines options were not fully specified then get state0 as last
-    # cmd_state that starts within available telemetry.  Update with the
-    # mean temperatures at the start of state0.
-    if None in state0.values():
-        state0 = cmd_states.get_state0(tlm['date'][-5], db,
-                                       datepar='datestart')
-        ok = ((tlm['date'] >= state0['tstart'] - 700) &
-              (tlm['date'] <= state0['tstart'] + 700))
+        # ACIS SCIENCE observations only  - no HRC; no CTI
+        non_cti_obs = eandf.cti_filter(obs_with_sensitivity)
 
-        state0.update({'T_acisfp': np.mean(tlm['fptemp'][ok])})
+        # ACIS SCIENCE OBS which are sensitive to FP TEMP
+        fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
 
-    # TEMPORARY HACK: core model doesn't actually support predictive
-    # active heater yet.  Initial temperature determines active heater
-    # state for predictions now.
-    #
-    # So clamp T_acisfp floor to 15.0
-    if state0['T_acisfp'] < 15:
-        state0['T_acisfp'] = 15.0
+        # Now if there is an Obsid in the FP Sense list that is ALSO in the
+        # No Pref list - remove that Obsid from the FP Sense list:
+        fp_sense_without_noprefs = []
 
-    mylog.debug('\n    MWP - state0 at %s is\n%s' % (DateTime(state0['tstart']).date,
-                                           pformat(state0)))
+        nopref_list = nopref_array['obsid'].tolist()
 
-    # Get commanded states after end of state0 through first backstop command time
-    cmds_datestart = state0['datestop']
-    cmds_datestop = bs_cmds[0]['date']
+        for eachobs in fp_sens_only_obs:
+            if str(eandf.get_obsid(eachobs)) not in nopref_list:
+                fp_sense_without_noprefs.append(eachobs)
 
-    mylog.info("    \n    fetchall date start and stop: %s %s " %(cmds_datestart, cmds_datestop))
+        temp = temps[self.msid]
 
-    # Get timeline load segments including state0 and beyond.
-    timeline_loads = db.fetchall("""SELECT * from timeline_loads
-                                 WHERE datestop > '%s'
-                                 and datestart < '%s'"""
-                                 % (cmds_datestart, cmds_datestop))
+        # ------------------------------------
+        #  CTI-ONLY, -118.7 violation check
+        # ------------------------------------
+        mylog.info('\n\nFP SENSITIVE -118.7 CTI ONLY violations')
+        # Collect any -118.7C violations of CTI runs. These are not
+        # load killers but need to be reported
 
-    mylog.info('    Found {} timeline_loads  after {}'.format(
-                len(timeline_loads), cmds_datestart))
+        plan_limit = FP_TEMP_SENSITIVE[self.msid]
+        cti_viols = search_obsids_for_viols(self.msid, plan_limit, cti_only_obs, 
+                                            temp, times)
 
-    # Get cmds since datestart within timeline_loads
-    db_cmds = cmd_states.get_cmds(cmds_datestart, db=db, update_db=False,
-                                  timeline_loads=timeline_loads)
+        # ------------------------------------------------------------
+        #  FP TEMP sensitive observations; -118.7 violation check
+        #     These are not load killers
+        # ------------------------------------------------------------
+        mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
+        # Set the limit for those observations that are sensitive to the FP Temp
+        plan_limit = FP_TEMP_SENSITIVE[self.msid]
 
-    # Delete non-load cmds that are within the backstop time span
-    # => Keep if timeline_id is not None or date < bs_cmds[0]['time']
-    db_cmds = [x for x in db_cmds if (x['timeline_id'] is not None or
-                                      x['time'] < bs_cmds[0]['time'])]
+        fp_sens_viols = search_obsids_for_viols(self.msid, plan_limit, 
+                                                fp_sense_without_noprefs, temp, times)
 
+        # --------------------------------------------------------------
+        #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run. 
+        #  These are load killers
+        # --------------------------------------------------------------
+        # 
+        mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-    mylog.info('    Got %d cmds from database between %s and %s' %
-                  (len(db_cmds), cmds_datestart, cmds_datestop))
+        # Set the limit 
+        plan_limit = ACIS_S_RED[self.msid]
+        ACIS_S_viols = search_obsids_for_viols(self.msid, plan_limit, 
+                                               ACIS_S_obs, temp, times)
 
-    # Get the commanded states from state0 through the end of backstop commands
-    states = cmd_states.get_states(state0, db_cmds + bs_cmds)
+        # --------------------------------------------------------------
+        #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run. 
+        #  These are load killers
+        # --------------------------------------------------------------
+        # 
+        mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
-    states[-1].datestop = bs_cmds[-1]['date']
-    states[-1].tstop = bs_cmds[-1]['time']
+        # set the planning limit to the -114 C Red limit for ACIS-I observations
+        plan_limit = ACIS_I_RED[self.msid]
 
+        # Create the violation data structure.
+        ACIS_I_viols = search_obsids_for_viols(self.msid, plan_limit, 
+                                               ACIS_I_obs, temp, times)
 
-    mylog.info('    Found %d commanded states from %s to %s' %
-                 (len(states), states[0]['datestart'], states[-1]['datestop']))
+        return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
 
-    # October 2015 - DH Heater addition
-    htrbfn='dahtbon_history.rdb'
-    mylog.info('    Reading file of dahtrb commands from file %s' % htrbfn)
-    htrb=Ska.Table.read_ascii_table(htrbfn,headerrow=2,headertype='rdb')
-    dh_heater_times=date2secs(htrb['time'])
-
-    dh_heater=htrb['dahtbon'].astype(bool)
-
-    #
-    # CALC_MODEL - Calculate the model
-    #
-    model = calc_model(opt.model_spec, states, state0['tstart'], tstop,
-                       state0['T_acisfp'], None, dh_heater, dh_heater_times)
-
-    # Make the DPA limit check plots and data files
-    plt.rc("axes", labelsize=10, titlesize=12)
-    plt.rc("xtick", labelsize=10)
-    plt.rc("ytick", labelsize=10)
-
-    temps = {'fptemp': model.comp['fptemp'].mvals}
-
-    #------------------------
-    #
-    #  call make_check_plots
-    #
-    #-------------------------
-    #
-    # obs_with_sensitivity contains all ACIS and all CTI observations 
-    # and has had the sensitivity boolean added.
-    plots, obs_with_sensitivity = make_check_plots(opt, states, model.times, temps, tstart, perigee_passages, nopref_array)
-
-    #-------------------
-    #
-    #  call make_viols
-    #
-    #-------------------
-    ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols = make_viols(opt, states, model.times, temps, obs_with_sensitivity, nopref_array)
-
-    # Write out the states.dat and temperatures.dat files
-    write_states(opt, states)
-    write_temps(opt, model.times, temps)
-
-    return dict(opt=opt, states=states, times=model.times, temps=temps,
-               plots=plots, cti_viols=cti_viols, ACIS_I_viols=ACIS_I_viols, ACIS_S_viols = ACIS_S_viols, fp_sens_viols=fp_sens_viols)
-
-#------------------------------------------------------------------------------
-#
-#   write_index_rst
-#
-#------------------------------------------------------------------------------
-def write_index_rst(opt, 
-                    proc, 
-                    plots_validation, 
-                    valid_viols=None,
-                    plots=None, 
-                    ACIS_I_viols=None, 
-                    ACIS_S_viols=None, 
-                    fp_sens_viols=None,
-                    cti_viols=None):
-    """
-    Make output text (in ReST format) in opt.outdir.
-
-    opt: a dictionary containing user supplied command line options
-    proc: Process info such as username, start/stop times, OS environment
-    plots_validation: returned list from make_validation_plots()
-    valid_viols:      returned list from make_validation_viols()
-    plots: dictionary containing prediction temp plots
-    viols: dictionary containing violation temp plots
-    """
-
-    # Django setup (used for template rendering)
-    import django.template
-    import django.conf
-    try:
-        django.conf.settings.configure()
-    except RuntimeError, msg:
-        print msg
-
-    outfile = os.path.join(opt.outdir, 'index.rst')
-    mylog.info('Writing report file %s' % outfile)
-
-    # Right now, the method to get the fptemp plot of interest 
-    # (fptempM120toM114.png) to be the main interest is pretty kludgy. 
-    # I happen to make 3 different plots of FP_TEMP vs Time at 3 different Y limit
-    # ranges. I placed the plot of interest last in the creation
-    # order so it handily appears in the "plots" dictionary used below
-    django_context = django.template.Context(
-        {'opt': opt,
-         'plots': plots,
-         'ACIS_I_viols': ACIS_I_viols,
-         'ACIS_S_viols': ACIS_S_viols,
-         'fp_sens_viols': fp_sens_viols,
-         'cti_viols': cti_viols,
-         'valid_viols': valid_viols,
-         'proc': proc,
-         'plots_validation': plots_validation,
-         })
-    index_template_file = ('index_template.rst'
-                           if opt.oflsdir else
-                           'index_template_val_only.rst')
-    index_template = open(os.path.join(TASK_DATA, index_template_file)).read()
-    index_template = re.sub(r' %}\n', ' %}', index_template)
-    template = django.template.Template(index_template)
-    open(outfile, 'w').write(template.render(django_context))
-
-#------------------------------------------------------------------------------
-#
-#   search_obsids_for_viols
-#
-#------------------------------------------------------------------------------
 def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     """
     Given a planning limit and a list of observations, find those time intervals
@@ -622,12 +467,9 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
 
     # Add any obs violations to the viols_list
     for change in changes:
-        datestart = DateTime(times[change[0]]).date
         tstart = times[change[0]]
-        datestop  = DateTime(times[change[1] - 1]).date
         tstop = times[change[1] - 1]
-        maxtemp = temp[change[0]:change[1]].max()
-
+        
         # find the observations that contains all or part of this time interval
         #  add this to the violations list "viols[msid]"
         #
@@ -642,24 +484,19 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
             # Get the observation tstart and tstop times, and obsid
             obs_tstart = eandf.get_tstart(eachobs)
             obs_tstop  = eandf.get_tstop(eachobs)
-            obsid = eandf.get_obsid(eachobs)
 
             # If either tstart is inside the obs tstart/tstop
             # OR 
             #    tstop is inside the obs tstart/tstop
             # 
-            if  ( (tstart >= obs_tstart) and \
-                  (tstart <= obs_tstop )) or \
-                ( (tstop >= obs_tstart) and \
-                  (tstop <= obs_tstop)) or \
-                ( (tstart <= obs_tstart) and \
-                  (tstop >= obs_tstop)):
-
+            if obs_tstop >= tstart >= obs_tstart or \
+               obs_tstop >= tstop >= obs_tstart or \
+               (tstart <= obs_tstart and tstop >= obs_tstop):
                 # Fetch the obsid for this observation and append to list
                 obsid_list = obsid_list + ' '+ str(eandf.get_obsid(eachobs))
 
         # If obsid_list is not empty, then create the violation
-        if (obsid_list != ''):
+        if obsid_list != '':
             # Figure out the max temp for the 
             # Then create the violation
             viol = {'datestart': DateTime(times[change[0]]).date,
@@ -678,128 +515,6 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
 
     # Finished - return the violations list
     return viols_list
-
-
-
-
-#------------------------------------------------------------------------------
-#
-#   make_viols
-#
-#------------------------------------------------------------------------------
-
-def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
-    """
-    Find limit violations where predicted temperature is above the
-    red minus margin.
-
-    MSID is a global 
-
-    obs_with_sensitivity contains all ACIS and CTI observations 
-    and they have had FP sensitivity boolean added. In other words it's
-    All ACIS and ECS runs.
-
-    We will create a list of CTI-ONLY runs, and a list of all
-    ACIS science runs without CTI runs. These two lists will
-    be used to assess the categories of violations:
-
-        1) Any ACIS-I observation that violates the -114 red limit 
-           is a violation and a load killer
-             - science_viols
-
-        2) Any ACIS-S observation that violates the -112 red limit 
-           is a violation and a load killer
-             - science_viols
-
-        3) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7 
-           results in a "Preferences Not Met" indicator.
-             - fp_sense_viols
-
-        3) Any CTI run that violates the -114 RED limit needs to be
-           tracked and is NOT a load killer
-             - cti_viols
-  
-    """
-    mylog.info('\nMAKE VIOLS Checking for limit violations in '+str(len(states))+' states and\n '+ str(len(obs_with_sensitivity))+ " total science observations")
-
-    # create an instance of ObsidFindFilter()
-    eandf = ObsidFindFilter()
-
-    #------------------------------------------------------
-    #   Create subsets of all the observations
-    #------------------------------------------------------
-    # Just the CTI runs
-    cti_only_obs = eandf.cti_only_filter(obs_with_sensitivity)
-    # Now divide out observations by ACIS-S and ACIS-I
-    ACIS_S_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-S")
-    ACIS_I_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-I")
-
-    # ACIS SCIENCE observations only  - no HRC; no CTI
-    non_cti_obs = eandf.cti_filter(obs_with_sensitivity)
-        
-    # ACIS SCIENCE OBS which are sensitive to FP TEMP
-    fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
- 
-    # Now if there is an Obsid in the FP Sense list that is ALSO in the
-    # No Pref list - remove that Obsid from the FP Sense list:
-    fp_sense_without_noprefs = []
-    
-    nopref_list = nopref_array['obsid'].tolist()
-
-    for eachobs in fp_sens_only_obs:
-        if str(eandf.get_obsid(eachobs)) not in nopref_list:
-            fp_sense_without_noprefs.append(eachobs)
-
-    # superfluous loop in this case since there is only one MSID
-    for msid in MSID:
-        temp = temps[msid]
-
-        #------------------------------------
-        #  CTI-ONLY, -118.7 violation check
-        #------------------------------------
-        mylog.info('\n\nCTI ONLY -118.7 FP SENSE violations')
-        # Collect any -118.7C violations of CTI runs. These are not
-        # load killers but need to be reported
-
-        plan_limit = FP_TEMP_SENSITIVE[msid]
-        cti_viols = search_obsids_for_viols(msid, plan_limit, cti_only_obs, temp, times)
-
-        #------------------------------------------------------------
-        #  FP TEMP sensitive observations; -118.7 violation check
-        #     These are not load killers
-        #------------------------------------------------------------
-        mylog.info('\n\nFP SENSITIVE SCIENCE ONLY -118.7 violations')
-        # Set the limit for  Thos eObservations that are sensitive to the FP Temp
-        plan_limit = FP_TEMP_SENSITIVE[msid]
-
-        fp_sens_viols = search_obsids_for_viols(msid, plan_limit, fp_sense_without_noprefs, temp, times)
-
-        #--------------------------------------------------------------
-        #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run. 
-        #  These are load killers
-        #--------------------------------------------------------------
-        # 
-        mylog.info('\n\n-112 ACIS-S SCIENCE ONLY violations')
-        # Set the limit 
-        plan_limit = ACIS_S_RED[msid]
-        ACIS_S_viols = search_obsids_for_viols(msid,  plan_limit, ACIS_S_obs, temp, times)
-     
-        #--------------------------------------------------------------
-        #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run. 
-        #  These are load killers
-        #--------------------------------------------------------------
-        # 
-        mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
-        # Create the violation data structure.
-        ACIS_I_viols = dict((x, []) for x in MSID)
-
-        # set the planning limit to the -114 C Red limit for ACIS-I observations
-        plan_limit = ACIS_I_RED[msid]
-
-        ACIS_I_viols = search_obsids_for_viols(msid, plan_limit,ACIS_I_obs , temp, times)
-
-    return ACIS_I_viols, cti_viols, fp_sens_viols, ACIS_S_viols
-
 
 #----------------------------------------------------------------------
 #
@@ -829,25 +544,19 @@ def paint_perigee(perigee_passages, states, plots, msid):
         # The index [1] item is always the Perigee Passage time. Draw that line in red
         # If this line is between tstart and tstop then it needs to be drawn 
         # on the plot. otherwise ignore
-        if(DateTime(eachpassage[1]).secs >= states['tstart'][0]) and \
-          (DateTime(eachpassage[1]).secs <= states['tstop'][-1]):
-          # Have to convert this time into the new x axis time scale necessitated by SKA
-          xpos = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[1]).secs])
+        if states['tstop'][-1] >= DateTime(eachpassage[1]).secs >= states['tstart'][0]:
+            # Have to convert this time into the new x axis time scale necessitated by SKA
+            xpos = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[1]).secs])
 
-          # now plot the line.
-          plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
+            # now plot the line.
+            plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
 
-          # Plot the perigee passage time so long as it was specified in the CTI_report file
-          if eachpassage[3] != "Not-within-load":
-              perigee_time = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[3]).secs])
-              plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', color='black', linewidth=2.0)
-          
+            # Plot the perigee passage time so long as it was specified in the CTI_report file
+            if eachpassage[3] != "Not-within-load":
+                perigee_time = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[3]).secs])
+                plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', 
+                                         color='black', linewidth=2.0)
 
-#----------------------------------------------------------------------
-#
-#   draw_obsids
-#
-#----------------------------------------------------------------------
 def draw_obsids(extract_and_filter, 
                 obs_with_sensitivity, 
                 nopref_array,
@@ -880,7 +589,6 @@ def draw_obsids(extract_and_filter,
                The starting position of the OBSID number text
                The font size
     """
-
     # Now run through the observation list attribute of the ObsidFindFilter class
     for eachobservation in obs_with_sensitivity:
         # extract the obsid
@@ -902,9 +610,10 @@ def draw_obsids(extract_and_filter,
             # extract the obsid for convenience
             this_obsid = extract_and_filter.get_obsid(eachobservation)
 
-            # But if it's also in the nopref list AND the upcased CandS_status entry is " NO PREF "
-            if (str(this_obsid) in nopref_array['obsid']) and \
-               ( nopref_array['CandS_status'][ np.where(nopref_array['obsid'] == str(this_obsid) )[0][0] ].upper()[:7]  == 'NO_PREF' ):
+            # But if it's also in the nopref list AND the upcased CandS_status entry is "NO PREF"
+            where_words = np.where(nopref_array['obsid'] == str(this_obsid))[0][0]
+            if str(this_obsid) in nopref_array['obsid'] and \
+               nopref_array['CandS_status'][where_words].upper()[:7] == 'NO_PREF':
                 color = 'purple'
                 obsid = obsid + ' * NO PREF *'
             else:
@@ -960,7 +669,7 @@ def draw_obsids(extract_and_filter,
 #                         Output:  nopref_array (numpy array)
 #
 #------------------------------------------------------------------------------
-def process_nopref_list(filespec="/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt"):
+def process_nopref_list(filespec=default_nopref_list):
     # Create the dtype for the nopref list rec array
     nopref_dtype = [('obsid', '|S10'), ('Seq_no', '|S10'), 
                     ('prop', '|S10'), ('CandS_status', '|S15')]
@@ -970,7 +679,7 @@ def process_nopref_list(filespec="/data/acis/LoadReviews/script/fp_temp_predicto
 
     # Open the nopref list file
     nopreflist = open(filespec, "r")
-    
+
     # For each line in the file......
     for line in nopreflist.readlines():
 
@@ -981,27 +690,20 @@ def process_nopref_list(filespec="/data/acis/LoadReviews/script/fp_temp_predicto
         if splitline[0][0] != '#':
 
             # Create the row
-            one_entry = np.array([(splitline[0], splitline[1], splitline[2], splitline[3])], dtype=nopref_dtype)
+            one_entry = np.array(splitline, dtype=nopref_dtype)
             # Append this row onto the array
             nopref_array = np.append(nopref_array, one_entry, axis=0)
 
     # Done with the nopref list file
     nopreflist.close()
-    
+
     # Now return the nopref array
     return nopref_array 
-        
 
-#------------------------------------------------------------------------------
-#
-#   make_check_plots   
-#
-#------------------------------------------------------------------------------
-def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref_array):
+def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_array):
     """
     Make output plots.
 
-    :param opt: options
     :param states: commanded states
     :param times: time stamps (sec) for temperature arrays
     :param temps: dict of temperatures
@@ -1408,9 +1110,8 @@ def make_validation_plots(opt, tlm, db):
     return plots
 
 def main():
-    opts = [("fps_nopref", 
-             {"default": os.path.join(model_path, "FPS_NoPref.txt"),
-              "help": "Full path to the FP sensitive nopref file"})]
+    opts = [("fps_nopref", {"default": default_nopref_list,
+             "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
     state_builder = make_state_builder(args.state_builder, args)
     acisfp_check = ACISFPCheck("fptemp", "acisfp", MSID, YELLOW,
