@@ -77,11 +77,6 @@ VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
 
 HIST_LIMIT = [-120.0]
 
-#
-# Initialize the logger. Set up a file for log output
-#
-logger = logging.getLogger('acisfp_check')
-
 URL = "file:///home/gregg/git/xija/models/acisfp"
 
 def calc_model(model_spec, states, start, stop, T_acisfp=None, T_acisfp_times=None, 
