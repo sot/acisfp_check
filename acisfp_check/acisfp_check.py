@@ -17,12 +17,10 @@ from __future__ import print_function
 import matplotlib
 matplotlib.use('Agg')
 
-
 import glob
 import logging
 from pprint import pformat
 import re
-import time
 import pickle
 
 import Ska.DBI
@@ -35,6 +33,7 @@ import Chandra.cmd_states as cmd_states
 
 from Chandra.Time import date2secs
 from astropy.io import ascii
+from collections import defaultdict
 import numpy as np
 import xija
 from acis_thermal_check import \
@@ -45,14 +44,13 @@ from acis_thermal_check import \
     get_acis_limits, mylog
 import os
 import sys
-
-model_path = os.path.abspath(os.path.dirname(__file__))
-
 #
 # Import ACIS-specific observation extraction, filtering 
 # and attribute support routines.
 #
-import ACISobs
+from acisfp_check.acis_obs import ObsidFindFilter
+
+model_path = os.path.abspath(os.path.dirname(__file__))
 
 #
 # INIT
@@ -625,14 +623,13 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     observations (if any) include part or all of those intervals.
     """
 
-    # create an instance of ACISobs.ObsidFindFilter()
-    eandf = ACISobs.ObsidFindFilter()
+    # create an instance of ObsidFindFilter()
+    eandf = ObsidFindFilter()
 
-    viols_list = dict((x, []) for x in MSID)
+    viols_list = defaultdict(list)
 
-    bad = np.concatenate(([False],
-                          temp >= plan_limit,
-                          [False]))
+    bad = np.concatenate([[False], temp >= plan_limit, [False]])
+    
     # changes is a list of lists. Each sublist is a 2-ple which
     # contains indices into the times list. 0 = start times 
     # and 1 = stop time
@@ -740,10 +737,8 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
     """
     mylog.info('\nMAKE VIOLS Checking for limit violations in '+str(len(states))+' states and\n '+ str(len(obs_with_sensitivity))+ " total science observations")
 
-#    viols = dict((x, []) for x in MSID)
-
-    # create an instance of ACISobs.ObsidFindFilter()
-    eandf = ACISobs.ObsidFindFilter()
+    # create an instance of ObsidFindFilter()
+    eandf = ObsidFindFilter()
 
     #------------------------------------------------------
     #   Create subsets of all the observations
@@ -792,7 +787,6 @@ def make_viols(opt, states, times, temps, obs_with_sensitivity, nopref_array):
         # Set the limit for  Thos eObservations that are sensitive to the FP Temp
         plan_limit = FP_TEMP_SENSITIVE[msid]
 
-        #fp_sens_viols = search_obsids_for_viols(msid, plan_limit, fp_sens_only_obs, temp, times)
         fp_sens_viols = search_obsids_for_viols(msid, plan_limit, fp_sense_without_noprefs, temp, times)
 
         #--------------------------------------------------------------
@@ -869,8 +863,7 @@ def paint_perigee(perigee_passages, states, plots, msid):
 #   draw_obsids
 #
 #----------------------------------------------------------------------
-def draw_obsids(opt, 
-                extract_and_filter, 
+def draw_obsids(extract_and_filter, 
                 obs_with_sensitivity, 
                 nopref_array,
                 plots,
@@ -892,7 +885,7 @@ def draw_obsids(opt,
 
     The caller supplies:
                Options from the Command line supplied by the user at runtime
-               The instance of the  ACISobs.ObsidFindFilter() class created 
+               The instance of the ObsidFindFilter() class created 
                nopref rec array
                The plot dictionary
                The MSID used to index into the plot dictinary (superfluous but required)
@@ -903,11 +896,7 @@ def draw_obsids(opt,
                The font size
     """
 
-    # Set the color for ACIS_S observations - green
-    color = 'green'
-
-
-    # Now run through the observation list attribute of the ACISobs class
+    # Now run through the observation list attribute of the ObsidFindFilter class
     for eachobservation in obs_with_sensitivity:
         # extract the obsid
 
@@ -924,7 +913,7 @@ def draw_obsids(opt,
         # sensitive
         #
         # If the observation is FP sensitive in the first place............
-        if (eachobservation[extract_and_filter.is_fp_sensitive] == True):
+        if eachobservation[extract_and_filter.is_fp_sensitive]:
             # extract the obsid for convenience
             this_obsid = extract_and_filter.get_obsid(eachobservation)
 
@@ -936,13 +925,11 @@ def draw_obsids(opt,
             else:
                 obsid = obsid + ' * FP SENS *'
 
-
         # Convert the start and stop times into the Ska-required format
         obs_start = Ska.Matplotlib.cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = Ska.Matplotlib.cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
-        if eachobservation[extract_and_filter.in_focal_plane] == "ACIS-I" or \
-           eachobservation[extract_and_filter.in_focal_plane] == "ACIS-S":
+        if eachobservation[extract_and_filter.in_focal_plane].startswith("ACIS-"):
             # For each ACIS Obsid, draw a horizontal line to show 
             # its start and stop
             plots[msid]['ax'].hlines(ypos, 
@@ -988,12 +975,13 @@ def draw_obsids(opt,
 #                         Output:  nopref_array (numpy array)
 #
 #------------------------------------------------------------------------------
-def process_nopref_list(filespec = "/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt"):
+def process_nopref_list(filespec="/data/acis/LoadReviews/script/fp_temp_predictor/FPS_NoPref.txt"):
     # Create the dtype for the nopref list rec array
-    nopref_dtype = [('obsid', '|S10'), ('Seq_no', '|S10'), ('prop', '|S10'), ('CandS_status', '|S15')]
+    nopref_dtype = [('obsid', '|S10'), ('Seq_no', '|S10'), 
+                    ('prop', '|S10'), ('CandS_status', '|S15')]
 
     # Create an empty nopref array
-    nopref_array = np.array([], dtype = nopref_dtype)
+    nopref_array = np.array([], dtype=nopref_dtype)
 
     # Open the nopref list file
     nopreflist = open(filespec, "r")
@@ -1008,15 +996,15 @@ def process_nopref_list(filespec = "/data/acis/LoadReviews/script/fp_temp_predic
         if splitline[0][0] != '#':
 
             # Create the row
-            one_entry = np.array( [ (splitline[0], splitline[1], splitline[2], splitline[3] )], dtype=nopref_dtype)
+            one_entry = np.array([(splitline[0], splitline[1], splitline[2], splitline[3])], dtype=nopref_dtype)
             # Append this row onto the array
-            nopref_array = np.append(nopref_array, one_entry, axis = 0)
+            nopref_array = np.append(nopref_array, one_entry, axis=0)
 
     # Done with the nopref list file
     nopreflist.close()
     
     # Now return the nopref array
-    return(nopref_array)
+    return nopref_array 
         
 
 #------------------------------------------------------------------------------
@@ -1049,7 +1037,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
     # various methods to filter the interval set based upon pitch range, 
     # number of ccd's, filter out CTI observations, and a range of exposure 
     # times.
-    extract_and_filter = ACISobs.ObsidFindFilter()
+    extract_and_filter = ObsidFindFilter()
 
     # extract the OBSID's from the commanded states. NOTE: this contains all
     # observations including CTI runs and HRC observations
@@ -1058,8 +1046,8 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
     # Filter out any HRC science observations BUT keep ACIS CTI observations
     acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
 
-    # Ok so now you have all the  ACIS observations collected. Also,
-    # they have been identified by ACISobs as to who is in the focal plane.
+    # Ok so now you have all the ACIS observations collected. Also,
+    # they have been identified by ObsidFindFilter as to who is in the focal plane.
     # Some apps, like this one, care about FP_TEMP sensitivity. Some do not. 
     # Since we do, then checking that and assigning a sensitivity must be done
     # 
@@ -1092,7 +1080,7 @@ def make_check_plots(opt, states, times, temps, tstart, perigee_passages, nopref
     # sensitivity boolean added.
     obs_with_sensitivity = []
 
-    # Now run through the observation list attribute of the ACISobs class
+    # Now run through the observation list attribute of the ObsidFindFilter class
     for eachobservation in acis_and_cti_obs:
         # Pull the obsid from the observation and turn it into a string
 
