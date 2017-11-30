@@ -64,14 +64,14 @@ MARGIN = {"fptemp": 2.5}
 # This is the cutoff temperature for any FPTEMP sensitive observation
 # if the FP temp goes above this number, and the obswervation is sensitive to
 # the focal plane temperature, it has to be flagged
-FP_TEMP_SENSITIVE = dict(fptemp = -118.7)
-FP_TEMP_MINIMUM = dict(fptemp = -118.7)
+FP_TEMP_SENSITIVE = {"fptemp": -118.7}
+FP_TEMP_MINIMUM = {"fptemp": -118.7}
 
 # This is the new maximum temperature for all ACIS-S observations (4/26/16)
-ACIS_S_RED = dict(fptemp = -112.0)
+ACIS_S_RED = {"fptemp": -112.0}
 
 # ACIS-I max temperatures remain at -114 deg. C
-ACIS_I_RED = dict(fptemp = -114.0)
+ACIS_I_RED = {"fptemp": -114.0}
 
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
