@@ -12,8 +12,8 @@ previous three weeks.
 """
 from __future__ import print_function
 
-# Matplotlib setup                                                                                                                                              
-# Use Agg backend for command-line (non-interactive) operation                                                                                                   
+# Matplotlib setup
+# Use Agg backend for command-line (non-interactive) operation
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -22,8 +22,6 @@ import glob
 import re
 import pickle
 
-import Ska.DBI
-import Ska.Table
 import Ska.Numpy
 import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime
@@ -77,7 +75,8 @@ HIST_LIMIT = [-120.0]
 
 URL = "file:///home/gregg/git/xija/models/acisfp"
 
-def calc_model(model_spec, states, start, stop, T_acisfp=None, 
+
+def calc_model(model_spec, states, start, stop, T_acisfp=None,
                T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
     """
     Create and run the Thermal Model for the Focal Plane temperature.
@@ -118,7 +117,6 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
     model.comp['sim_z'].set_data(states['simpos'], times)
     model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
 
-    #  
     for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
         model.comp[name].set_data(states[name], times)
 
@@ -135,7 +133,7 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
         model.comp[name].set_data(states[state_name], times)
 
     # Get ephemeris from eng archive
-    for axis in ('x', 'y', 'z'):
+    for axis in "xyz":
         name = 'orbitephem0_{}'.format(axis)
         msid = fetch.Msid(name, model.tstart - 2000, model.tstop + 2000)
         model.comp[name].set_data(msid.vals, msid.times)
@@ -211,7 +209,7 @@ class ACISFPCheck(ACISThermalCheck):
             # create an empty Peri. Passage instance location
             passage = []
 
-            # split the CRM Pad Time file line read in and extract the 
+            # split the CRM Pad Time file line read in and extract the
             # relevant information
             splitline = aline.split()
             passage.append(splitline[0])  # Event Type (EEF or XEF)
@@ -295,9 +293,9 @@ class ACISFPCheck(ACISThermalCheck):
             pred = defaultdict(lambda: None)
 
         plots_validation = make_validation_plots(opt, tlm, db)
-    
+
         valid_viols = make_validation_viols(plots_validation)
-    
+
         # if you found some violations....
         if len(valid_viols) > 0:
             # generate daily plot url if outdir in expected year/day format
@@ -459,9 +457,9 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     viols_list = defaultdict(list)
 
     bad = np.concatenate([[False], temp >= plan_limit, [False]])
-    
+
     # changes is a list of lists. Each sublist is a 2-ple which
-    # contains indices into the times list. 0 = start times 
+    # contains indices into the times list. 0 = start times
     # and 1 = stop time
     changes = np.flatnonzero(bad[1:] != bad[:-1]).reshape(-1, 2)
 
@@ -469,11 +467,11 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     for change in changes:
         tstart = times[change[0]]
         tstop = times[change[1] - 1]
-        
+
         # find the observations that contains all or part of this time interval
         #  add this to the violations list "viols[msid]"
         #
-        # First create an empty obsid list. This list represents all the 
+        # First create an empty obsid list. This list represents all the
         # observations that contain the violation represented by this change
         # (if any)
         obsid_list = ''
@@ -483,12 +481,11 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
         for eachobs in observations:
             # Get the observation tstart and tstop times, and obsid
             obs_tstart = eandf.get_tstart(eachobs)
-            obs_tstop  = eandf.get_tstop(eachobs)
+            obs_tstop = eandf.get_tstop(eachobs)
 
             # If either tstart is inside the obs tstart/tstop
-            # OR 
+            # OR
             #    tstop is inside the obs tstart/tstop
-            # 
             if obs_tstop >= tstart >= obs_tstart or \
                obs_tstop >= tstop >= obs_tstart or \
                (tstart <= obs_tstart and tstop >= obs_tstop):
@@ -497,7 +494,7 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
 
         # If obsid_list is not empty, then create the violation
         if obsid_list != '':
-            # Figure out the max temp for the 
+            # Figure out the max temp for the
             # Then create the violation
             viol = {'datestart': DateTime(times[change[0]]).date,
                     'datestop': DateTime(times[change[1] - 1]).date,
