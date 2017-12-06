@@ -143,8 +143,6 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
     # reached that point
     model.comp['dpa_power'].set_data(0.0)
     model.comp['1cbat'].set_data(-53.0)
-    model.comp['sim_px'].set_data(-120.0)
-    model.comp['fptemp'].set_data(-120.0)
 
     # Create the model
     model.make()
