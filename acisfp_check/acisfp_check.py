@@ -443,6 +443,20 @@ class ACISFPCheck(ACISThermalCheck):
 
         return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
 
+    def get_histogram_mask(self, msid, tlm, limit):
+        # Make quantiles. Use the histogram limits to decide 
+        # what temperature range will be included in the quantiles
+        # (we don't care about violations at low temperatures or 
+        # very high ones for this model)
+        # For FPTEMP, the only quantiles we want are those where 
+        # the temperature is -120.0 <= fptemp <= -112.0
+        if msid == self.msid:
+            ok = (tlm[msid] >= limit[0][0]) & (tlm[msid] <= limit[0][1]) # TA
+        else:
+            ok = np.ones(len(tlm[msid]), dtype=bool)
+
+        return ok
+
 def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     """
     Given a planning limit and a list of observations, find those time intervals
@@ -955,155 +969,6 @@ def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_arra
     plots['pow_sim']['filename'] = filename
 
     return plots, obs_with_sensitivity
-
-#------------------------------------------------------------------------------
-#
-#   make_validation_plots
-#
-#------------------------------------------------------------------------------
-def make_validation_plots(opt, tlm, db):
-    """
-    Make validation output plots.
-
-    :param outdir: output directory
-    :param tlm: telemetry obtained from MAIN; get_telem_values
-                '1dpamzt',              
-                'fptemp_11',
-                '1cbat',
-                'sim_z',              
-                'aosares1',           
-                'dp_dpa_power
-    :param db: database handle
-    :returns: list of plot info including plot file names
-    """
-    outdir = opt.outdir
-    start = tlm['date'][0]
-    stop = tlm['date'][-1]
-    states = get_states(start, stop, db)
-
-    # Create array of times at which to calculate FP temperatures, then do it
-    mylog.info('\nCalculating Focal Plane thermal model for validation')
-
-    model = calc_model(opt.model_spec, states, start, stop)
-
-    # Interpolate states onto the tlm.date grid
-    # TA REMOVED state_vals = cmd_states.interpolate_states(states, model.times)
-
-    #? make a list of items for which predictions need be made
-    pred = {'fptemp': model.comp['fptemp'].mvals,
-            'pitch': model.comp['pitch'].mvals,
-            'tscpos': model.comp['sim_z'].mvals
-            }
-
-    idxs = Ska.Numpy.interpolate(np.arange(len(tlm)), tlm['date'], model.times,
-                                 method='nearest')
-
-    tlm = tlm[idxs]
-
-
-    labels = {'fptemp': 'Degrees (C)',
-              'pitch': 'Pitch (degrees)',
-              'tscpos': 'SIM-Z (steps/1000)',
-              }
-
-    scales = {'tscpos': 1000.}
-
-    fmts = {'fptemp': '%.2f',
-            'pitch': '%.3f',
-            'tscpos': '%d'}
-
-    # 10/2015 DH Heater acisfp_check.py Addition
-    good_mask = np.ones(len(tlm),dtype='bool')
-    for interval in model.bad_times:
-        bad = ((tlm['date'] >= DateTime(interval[0]).secs)
-            & (tlm['date'] < DateTime(interval[1]).secs))
-        good_mask[bad] = False
-
-
-    plots = []
-    mylog.info('   Making FPTEMP model validation plots and quantile table')
-    quantiles = (1, 5, 16, 50, 84, 95, 99)
-    # store lines of quantile table in a string and write out later
-    quant_table = ''
-    quant_head = ",".join(['MSID'] + ["quant%d" % x for x in quantiles])
-    quant_table += quant_head + "\n"
-    for fig_id, msid in enumerate(sorted(pred)): 
-        plot = dict(msid=msid.upper())
-        fig = plt.figure(10 + fig_id, figsize=(7, 3.5))
-        fig.clf()
-        scale = scales.get(msid, 1.0)
-        ticklocs, fig, ax = plot_cxctime(model.times, tlm[msid] / scale,
-                                         fig=fig, fmt='-r')
-        ticklocs, fig, ax = plot_cxctime(model.times, pred[msid] / scale,
-                                         fig=fig, fmt='-b')
-
-        # Added 10/2015 DH Heater Addition
-        if  np.any(~good_mask) :
-            ticklocs, fig, ax = plot_cxctime(model.times[~good_mask], tlm[msid][~good_mask] / scale,
-                                         fig=fig, fmt='.c')
-
-
-        ax.set_title(msid.upper() + ' validation')
-        ax.set_ylabel(labels[msid])
-        ax.grid()
-        filename = msid + '_valid.png'
-        outfile = os.path.join(outdir, filename)
-        mylog.info('   Writing plot file %s' % outfile)
-        fig.savefig(outfile)
-        plot['lines'] = filename
-
-        # Make quantiles
-        #
-        # For FPTEMP, the only quantiles we want are those where the temperature is 
-        # -120.0 <= fp temp <= -112.0
-        if msid == 'fptemp':
-            ok = (tlm[msid] >= -120.0) & (tlm[msid] <= -112.0) # TA
-        else:
-            ok = np.ones(len(tlm[msid]), dtype=bool)
-
-
-        diff = np.sort(tlm[msid][ok] - pred[msid][ok])
-
-        quant_line = "%s" % msid
-        for quant in quantiles:
-            quant_val = diff[(len(diff) * quant) // 100]
-            plot['quant%02d' % quant] = fmts[msid] % quant_val
-            quant_line += (',' + fmts[msid] % quant_val)
-        quant_table += quant_line + "\n"
-
-        for histscale in ('log', 'lin'):
-            fig = plt.figure(20 + fig_id, figsize=(4, 3))
-            fig.clf()
-            ax = fig.gca()
-            ax.hist(diff / scale, bins=50, log=(histscale == 'log'))
-            ax.set_title(msid.upper() + ' residuals: data - model')
-            ax.set_xlabel(labels[msid])
-            fig.subplots_adjust(bottom=0.18)
-            filename = '%s_valid_hist_%s.png' % (msid, histscale)
-            outfile = os.path.join(outdir, filename)
-            mylog.info('   Writing plot file %s' % outfile)
-            fig.savefig(outfile)
-            plot['hist' + histscale] = filename
-
-        plots.append(plot)
-
-    filename = os.path.join(outdir, 'validation_quant.csv')
-    mylog.info('   Writing quantile table %s' % filename)
-    f = open(filename, 'w')
-    f.write(quant_table)
-    f.close()
-
-    # If run_start is specified this is likely for regression testing
-    # or other debugging.  In this case write out the full predicted and
-    # telemetered dataset as a pickle.
-    if opt.run_start:
-        filename = os.path.join(outdir, 'validation_data.pkl')
-        mylog.info('   Writing validation data %s' % filename)
-        f = open(filename, 'w')
-        pickle.dump({'pred': pred, 'tlm': tlm}, f, protocol=-1)
-        f.close()
-
-    return plots
 
 def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
