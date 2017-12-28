@@ -187,7 +187,7 @@ class ACISFPCheck(ACISThermalCheck):
         crm_file = open(crm_file_path, 'r')
 
         alines = crm_file.readlines()
-        
+
         idx = None
         # Keep reading until you hit the last header line which is all "*"'s
         for i, aline in enumerate(alines):
@@ -244,7 +244,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots, obs_with_sensitivity = make_check_plots(states, model.times, temps, 
                                                        tstart, perigee_passages, 
                                                        nopref_array)
-    
+
         viols = self.make_viols(states, model.times, temps, obs_with_sensitivity, 
                                 nopref_array)
 
@@ -535,7 +535,7 @@ def paint_perigee(perigee_passages, states, plots, msid):
     """
     This function draws vertical dahsed lines for EEF, Perigee and XEF
     events in the load.EEF and XEF lines are black; Perigee is red.
-    
+
     You supply the list of perigee passage events which are:
         Event Type (EEF or XEF)
         CTI Start time
@@ -672,7 +672,7 @@ def draw_obsids(extract_and_filter,
 #------------------------------------------------------------------------------
 #
 #   process_nopref_list - read and store the list of observations which
-#                         prefer a Cold and Stable focal plane, but 
+#                         prefer a Cold and Stable focal plane, but
 #                         which have had that desire waived.
 #
 #                          Input:  nopref file specification
@@ -844,7 +844,8 @@ def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_arra
         endcapstop = -109.0
         textypos = -108.0
         fontsize = 12
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
+                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
 
         # Build the file name and output the plot to a file
         filename = MSID[msid].lower() + 'M120toM90.png'
@@ -886,7 +887,8 @@ def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_arra
         endcapstop = ypos - 0.05
         textypos = ypos + 0.05
         fontsize = 9
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
+                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
 
         # Build the file name and output the file
         filename = MSID[msid].lower() + 'M120toM119.png'
@@ -927,7 +929,8 @@ def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_arra
         textypos = -115.7
         fontsize = 9
 
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
+                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
 
         # Draw a horizontal line indicating the FP Sensitive Observation Cut off
         plots[msid]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
