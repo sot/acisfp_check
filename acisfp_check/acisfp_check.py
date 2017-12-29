@@ -410,7 +410,7 @@ class ACISFPCheck(ACISThermalCheck):
         # load killers but need to be reported
 
         plan_limit = FP_TEMP_SENSITIVE[self.name]
-        cti_viols = search_obsids_for_viols(self.msid, plan_limit, cti_only_obs, 
+        cti_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, cti_only_obs, 
                                             temp, times)
 
         # ------------------------------------------------------------
@@ -421,7 +421,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Set the limit for those observations that are sensitive to the FP Temp
         plan_limit = FP_TEMP_SENSITIVE[self.name]
 
-        fp_sens_viols = search_obsids_for_viols(self.msid, plan_limit, 
+        fp_sens_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
                                                 fp_sense_without_noprefs, temp, times)
 
         # --------------------------------------------------------------
@@ -433,7 +433,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         # Set the limit 
         plan_limit = ACIS_S_RED[self.name]
-        ACIS_S_viols = search_obsids_for_viols(self.msid, plan_limit, 
+        ACIS_S_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
                                                ACIS_S_obs, temp, times)
 
         # --------------------------------------------------------------
@@ -447,7 +447,7 @@ class ACISFPCheck(ACISThermalCheck):
         plan_limit = ACIS_I_RED[self.name]
 
         # Create the violation data structure.
-        ACIS_I_viols = search_obsids_for_viols(self.msid, plan_limit, 
+        ACIS_I_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
                                                ACIS_I_obs, temp, times)
 
         return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
@@ -460,7 +460,7 @@ class ACISFPCheck(ACISThermalCheck):
         # For FPTEMP, the only quantiles we want are those where 
         # the temperature is -120.0 <= fptemp <= -112.0
         if msid == self.msid:
-            ok = (tlm[msid] >= limit[0][0]) & (tlm[msid] <= limit[0][1]) # TA
+            ok = (tlm[msid] >= limit[0]) & (tlm[msid] <= limit[1]) # TA
         else:
             ok = np.ones(len(tlm[msid]), dtype=bool)
 
@@ -734,11 +734,11 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('   Writing plot file %s' % outfile)
         plots['pow_sim']['fig'].savefig(outfile)
         plots['pow_sim']['filename'] = filename
-    
+
         return plots, obs_with_sensitivity
 
 
-def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
+def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times):
     """
     Given a planning limit and a list of observations, find those time intervals
     where the temp gets warmer than the planning limit and identify which 
@@ -801,7 +801,7 @@ def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
 
             mylog.info('   VIOLATION: %s  exceeds planning limit of %.2f '
                         'degC from %s to %s'
-                        % (MSID[msid], plan_limit, viol['datestart'],
+                        % (MSID[name], plan_limit, viol['datestart'],
                         viol['datestop']))
 
     # Finished - return the violations list
