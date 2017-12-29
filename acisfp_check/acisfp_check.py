@@ -116,6 +116,8 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
     model.comp['sim_z'].set_data(states['simpos'], times)
     model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
 
+    model.comp['roll'].set_data(calc_off_nom_rolls(states), times)
+
     for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
         model.comp[name].set_data(states[name], times)
 
