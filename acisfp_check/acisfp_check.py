@@ -583,8 +583,8 @@ class ACISFPCheck(ACISThermalCheck):
                                    )
             plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
                                       linewidth=2.0)
-    
-            plots[msid]['ax'].axvline(load_start, linestyle=':', color='g',
+            # Add a vertical line to mark the start time of the load
+            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
                                       linewidth=2.0)
     
             #
@@ -628,7 +628,10 @@ class ACISFPCheck(ACISThermalCheck):
                                    ylim2=(40, 180),
                                    figsize=(14, 7),
                                    )
-    
+            # Add a vertical line to mark the start time of the load
+            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
+                                      linewidth=2.0)
+
             #
             # Now plot any perigee passages that occur between xmin and xmax
             #
@@ -670,6 +673,9 @@ class ACISFPCheck(ACISThermalCheck):
                                    ylim2=(40, 180),
                                    figsize=(14, 7),
                                    )
+            # Add a vertical line to mark the start time of the load
+            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
+                                      linewidth=2.0)
             #
             # Now plot any perigee passages that occur between xmin and xmax
             #
@@ -716,8 +722,9 @@ class ACISFPCheck(ACISThermalCheck):
             ylabel2='SIM-Z (steps)',
             ylim2=(-105000, 105000),
         )
-        plots['pow_sim']['ax'].axvline(load_start, linestyle=':', color='g',
-                                       linewidth=1.0)
+        # Add a vertical line to mark the start time of the load
+        plots['pow_sim']['ax'].axvline(load_start, linestyle='-', color='g',
+                                       linewidth=2.0)
         plots['pow_sim']['fig'].subplots_adjust(right=0.85)
         filename = 'pow_sim.png'
         outfile = os.path.join(outdir, filename)
