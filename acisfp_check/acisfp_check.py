@@ -20,13 +20,10 @@ import matplotlib.pyplot as plt
 
 import glob
 import re
-import pickle
-
+from Ska.Matplotlib import pointpair
 import Ska.Numpy
 import Ska.engarchive.fetch_sci as fetch
-from Chandra.Time import DateTime
-
-from Chandra.Time import date2secs
+from Chandra.Time import DateTime, date2secs
 from astropy.io import ascii
 from collections import defaultdict
 import numpy as np
@@ -37,6 +34,8 @@ from acis_thermal_check import \
     get_options, \
     make_state_builder, \
     get_acis_limits, mylog
+from acis_thermal_check.utils import \
+    plot_two
 import os
 import sys
 #
@@ -71,7 +70,7 @@ VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
                      }
 
-HIST_LIMIT = [-120.0]
+HIST_LIMIT = [(-120.0, -112.0)]
 
 URL = "file:///home/gregg/git/xija/models/acisfp"
 
@@ -241,9 +240,10 @@ class ACISFPCheck(ACISThermalCheck):
 
         # obs_with_sensitivity contains all ACIS and all CTI observations 
         # and has had the sensitivity boolean added.
-        plots, obs_with_sensitivity = make_check_plots(states, model.times, temps, 
-                                                       tstart, perigee_passages, 
-                                                       nopref_array)
+        plots, obs_with_sensitivity = self.make_check_plots(outdir, states, 
+                                                            model.times, temps, 
+                                                            tstart, perigee_passages, 
+                                                            nopref_array)
 
         viols = self.make_viols(states, model.times, temps, obs_with_sensitivity, 
                                 nopref_array)
@@ -291,9 +291,13 @@ class ACISFPCheck(ACISThermalCheck):
         else:
             pred = defaultdict(lambda: None)
 
-        plots_validation = make_validation_plots(opt, tlm, db)
+        # Validation
+        # Make the validation plots
+        plots_validation = self.make_validation_plots(tlm, args.model_spec,
+                                                      args.outdir, args.run_start)
 
-        valid_viols = make_validation_viols(plots_validation)
+        # Determine violations of temperature validation
+        valid_viols = self.make_validation_viols(plots_validation)
 
         # if you found some violations....
         if len(valid_viols) > 0:
@@ -456,6 +460,270 @@ class ACISFPCheck(ACISThermalCheck):
             ok = np.ones(len(tlm[msid]), dtype=bool)
 
         return ok
+
+    def make_check_plots(self, outdir, states, times, temps, tstart, 
+                         perigee_passages, nopref_array):
+        """
+        Make output plots.
+    
+        :param states: commanded states
+        :param times: time stamps (sec) for temperature arrays
+        :param temps: dict of temperatures
+        :param tstart: load start time
+        :rtype: dict of review information including plot file names
+    
+        This function assumes that ACIS Ops LR has been run and that the directory 
+        is populated with
+        """
+    
+        # Next we need to find all the ACIS-S observations within the start/stop
+        # times so that we can paint those on the plots as well. We will get
+        # those from the commanded states data structure called "states" 
+        # 
+        # Create an instance of the ObsidFindFilter class. This class provides
+        # methods to extract obsid intervals from the commanded states based 
+        # upon ACIS definitions and considerations. It also provides
+        # various methods to filter the interval set based upon pitch range, 
+        # number of ccd's, filter out CTI observations, and a range of exposure 
+        # times.
+        extract_and_filter = ObsidFindFilter()
+    
+        # extract the OBSID's from the commanded states. NOTE: this contains all
+        # observations including CTI runs and HRC observations
+        observation_intervals = extract_and_filter.find_obsid_intervals(states, None)
+    
+        # Filter out any HRC science observations BUT keep ACIS CTI observations
+        acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
+    
+        # Ok so now you have all the ACIS observations collected. Also,
+        # they have been identified by ObsidFindFilter as to who is in the focal plane.
+        # Some apps, like this one, care about FP_TEMP sensitivity. Some do not. 
+        # Since we do, then checking that and assigning a sensitivity must be done
+        # 
+        # Open the sensitive observation list file, which is found in the LR 
+        # directory,
+        # read each line, extract the OBSID and add that to a list.
+        sensefile = open(self.bsdir + '/fp_sensitive.txt', 'r')
+    
+        # The list_of_sensitive_obs is the list of all FP TEMP sensitive 
+        # observations extracted from the file in the load review directory
+        list_of_sensitive_obs = []
+    
+        # Get the list of FP_TEMP sensitive observations
+        for eachline in sensefile.readlines()[1:]:
+            # Extract the OBSID from each line; the obsid is in the second
+            # column of this line. Append it to the list of FP_TEMP sensitive
+            # observations
+            #
+            # NOTE: The obsid here is a STRING
+            list_of_sensitive_obs.append(eachline.split()[1])
+        # Done with the file - close it
+        sensefile.close()
+    
+        # Now that you have the latest list of temperature sensitive OBSID's, 
+        # run through each observation and append either "*FP SENS*" or
+        # "NOT FP SENS" to the end of each observation. 
+        #
+        # Create an empty observation list which will hold the results. This
+        # list contains all ACIS and all CTI observations and will have the 
+        # sensitivity boolean added.
+        obs_with_sensitivity = []
+    
+        # Now run through the observation list attribute of the ObsidFindFilter class
+        for eachobservation in acis_and_cti_obs:
+            # Pull the obsid from the observation and turn it into a string
+    
+            obsid = str(extract_and_filter.get_obsid(eachobservation))
+            # See if it's in the sensitive list. If so, indicate whether or
+            # not this observation is FP Senstive in the new list. This will be
+            # used later in make_viols to catch violations.
+            if obsid in list_of_sensitive_obs:
+                eachobservation.append(True)
+            else:
+                eachobservation.append(False)
+    
+            obs_with_sensitivity.append(eachobservation)
+    
+        #
+        # create an empty dictionary called plots to contain the returned 
+        # figures, axes 1  and axes 2 of the plot_two call
+        plots = {}
+    
+        # Start time of loads being reviewed expressed in units for plotdate()
+        load_start = Ska.Matplotlib.cxctime2plotdate([tstart])[0]
+    
+        #
+        # Make  plots of FPTEMP and pitch vs time 
+        #
+        #
+        # For each MSID in the loop statement, make a plot from -120 to 20
+        #   - kind of a superfluous loop in this case.
+        #
+        for fig_id, msid in enumerate(('fptemp',)):
+            # -----------------------------------------------------
+            #
+            #   PLOT 1 -  fptemp_11 plt with ylim from -120 to -90
+            # 
+            # -----------------------------------------------------
+            plots[msid] = plot_two(fig_id=fig_id + 1,
+                                   x=times,
+                                   y=temps[msid],
+                                   x2=pointpair(states['tstart'], states['tstop']),
+                                   y2=pointpair(states['pitch']),
+                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   xlabel='Date',
+                                   ylabel='Temperature (C)',
+                                   ylabel2='Pitch (deg)',
+                                   ylim=(-120, -90),
+                                   ylim2=(40, 180),
+                                   figsize=(14, 7),
+                                   )
+            plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
+                                      linewidth=2.0)
+    
+            plots[msid]['ax'].axvline(load_start, linestyle=':', color='g',
+                                      linewidth=2.0)
+    
+            #
+            # Now plot any perigee passages that occur between xmin and xmax
+            # for eachpassage in perigee_passages:
+            paint_perigee(perigee_passages, states, plots, msid)
+    
+            # Now draw horizontal lines on the plot running from start to stop
+            # and label them with the Obsid
+            ypos = -110.0
+            endcapstart = -111.0
+            endcapstop = -109.0
+            textypos = -108.0
+            fontsize = 12
+            draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
+                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+    
+            # Build the file name and output the plot to a file
+            filename = MSID[msid].lower() + 'M120toM90.png'
+            outfile = os.path.join(outdir, filename)
+            mylog.info('Writing plot file %s' % outfile)
+            plots[msid]['fig'].savefig(outfile)
+            plots[msid]['filename'] = filename
+    
+            # ------------------------------------------------------
+            #
+            #   PLOT 2 -  fptemp_11 plt with ylim from -120 to -119
+            # 
+            # ------------------------------------------------------
+            #
+            plots[msid] = plot_two(fig_id=fig_id + 1,
+                                   x=times,
+                                   y=temps[msid],
+                                   x2=pointpair(states['tstart'], states['tstop']),
+                                   y2=pointpair(states['pitch']),
+                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   xlabel='Date',
+                                   ylabel='Temperature (C)',
+                                   ylabel2='Pitch (deg)',
+                                   ylim=(-120, -119),
+                                   ylim2=(40, 180),
+                                   figsize=(14, 7),
+                                   )
+    
+            #
+            # Now plot any perigee passages that occur between xmin and xmax
+            #
+            paint_perigee(perigee_passages, states, plots, msid)
+    
+            # Now draw horizontal lines on the plot running form start to stop
+            # and label them with the Obsid
+            ypos = -119.35
+            endcapstart = ypos + 0.05
+            endcapstop = ypos - 0.05
+            textypos = ypos + 0.05
+            fontsize = 9
+            draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
+                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+    
+            # Build the file name and output the file
+            filename = MSID[msid].lower() + 'M120toM119.png'
+            outfile = os.path.join(outdir, filename)
+            mylog.info('   Writing plot file %s' % outfile)
+            plots[msid]['fig'].savefig(outfile)
+            plots[msid]['filename'] = filename
+    
+            # ------------------------------------------------------
+            #
+            #   PLOT 3 -  fptemp_11 plt with ylim from -120 to -112
+            # 
+            # ------------------------------------------------------
+            #
+            plots[msid] = plot_two(fig_id=fig_id + 1,
+                                   x=times,
+                                   y=temps[msid],
+                                   x2=pointpair(states['tstart'], states['tstop']),
+                                   y2=pointpair(states['pitch']),
+                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   xlabel='Date',
+                                   ylabel='Temperature (C)',
+                                   ylabel2='Pitch (deg)',
+                                   ylim=(-120, -111.5),
+                                   ylim2=(40, 180),
+                                   figsize=(14, 7),
+                                   )
+            #
+            # Now plot any perigee passages that occur between xmin and xmax
+            #
+            paint_perigee(perigee_passages, states, plots, msid)
+    
+            # Now draw horizontal lines on the plot running from start to stop
+            # and label them with the Obsid
+            ypos = -116
+            endcapstart = -116.2
+            endcapstop = -115.8
+            textypos = -115.7
+            fontsize = 9
+    
+            draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
+                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+    
+            # Draw a horizontal line indicating the FP Sensitive Observation Cut off
+            plots[msid]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
+            # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
+            plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
+            # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
+            plots[msid]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
+    
+            # Build the file name and output the file
+            filename = MSID[msid].lower() + 'M120toM112.png'
+            outfile = os.path.join(outdir, filename)
+            mylog.info('   Writing plot file %s' % outfile)
+            plots[msid]['fig'].savefig(outfile)
+            plots[msid]['filename'] = filename
+    
+        # end of for fig_id, msid in enumerate(('fptemp',)):
+    
+        # Now create the plot of ACIS CCD number and Sim-Z position
+        plots['pow_sim'] = plot_two(
+            fig_id=fig_id + 1,
+            title='ACIS CCDs and SIM-Z position',
+            xlabel='Date',
+            x=pointpair(states['tstart'], states['tstop']),
+            y=pointpair(states['ccd_count']),
+            ylabel='CCD_COUNT',
+            ylim=(-0.1, 6.1),
+            x2=pointpair(states['tstart'], states['tstop']),
+            y2=pointpair(states['simpos']),
+            ylabel2='SIM-Z (steps)',
+            ylim2=(-105000, 105000),
+        )
+        plots['pow_sim']['ax'].axvline(load_start, linestyle=':', color='g',
+                                       linewidth=1.0)
+        plots['pow_sim']['fig'].subplots_adjust(right=0.85)
+        filename = 'pow_sim.png'
+        outfile = os.path.join(outdir, filename)
+        mylog.info('   Writing plot file %s' % outfile)
+        plots['pow_sim']['fig'].savefig(outfile)
+        plots['pow_sim']['filename'] = filename
+    
+        return plots, obs_with_sensitivity
+
 
 def search_obsids_for_viols(msid, plan_limit, observations, temp, times):
     """
@@ -709,269 +977,6 @@ def process_nopref_list(filespec=default_nopref_list):
 
     # Now return the nopref array
     return nopref_array 
-
-def make_check_plots(states, times, temps, tstart, perigee_passages, nopref_array):
-    """
-    Make output plots.
-
-    :param states: commanded states
-    :param times: time stamps (sec) for temperature arrays
-    :param temps: dict of temperatures
-    :param tstart: load start time
-    :rtype: dict of review information including plot file names
-
-    This function assumes that ACIS Ops LR has been run and that the directory 
-    is populated with
-    """
-
-    # Next we need to find all the ACIS-S observations within the start/stop
-    # times so that we can paint those on the plots as well. We will get
-    # those from the commanded states data structure called "states" 
-    # 
-    # Create an instance of the ObsidFindFilter class. This class provides
-    # methods to extract obsid intervals from the commanded states based 
-    # upon ACIS definitions and considerations. It also provides
-    # various methods to filter the interval set based upon pitch range, 
-    # number of ccd's, filter out CTI observations, and a range of exposure 
-    # times.
-    extract_and_filter = ObsidFindFilter()
-
-    # extract the OBSID's from the commanded states. NOTE: this contains all
-    # observations including CTI runs and HRC observations
-    observation_intervals = extract_and_filter.find_obsid_intervals(states, None)
-
-    # Filter out any HRC science observations BUT keep ACIS CTI observations
-    acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
-
-    # Ok so now you have all the ACIS observations collected. Also,
-    # they have been identified by ObsidFindFilter as to who is in the focal plane.
-    # Some apps, like this one, care about FP_TEMP sensitivity. Some do not. 
-    # Since we do, then checking that and assigning a sensitivity must be done
-    # 
-    # Open the sensitive observation list file, which is found in the LR 
-    # directory,
-    # read each line, extract the OBSID and add that to a list.
-    sensefile = open(opt.oflsdir+'/fp_sensitive.txt', 'r')
-
-    # The list_of_sensitive_obs is the list of all FP TEMP sensitive 
-    # observations extracted from the file in the load review directory
-    list_of_sensitive_obs = []
-
-    # Get the list of FP_TEMP sensitive observations
-    for eachline in sensefile.readlines()[1:]:
-        # Extract the OBSID from each line; the obsid is in the second
-        # column of this line. Append it to the list of FP_TEMP sensitive
-        # observations
-        #
-        # NOTE: The obsid here is a STRING
-        list_of_sensitive_obs.append(eachline.split()[1] )
-    # Done with the file - close it
-    sensefile.close()
-
-    # Now that you have the latest list of temperature sensitive OBSID's, 
-    # run through each observation and append either "*FP SENS*" or
-    # "NOT FP SENS" to the end of each observation. 
-    #
-    # Create an empty observation list which will hold the results. This
-    # list contains all ACIS and all CTI observations and will have the 
-    # sensitivity boolean added.
-    obs_with_sensitivity = []
-
-    # Now run through the observation list attribute of the ObsidFindFilter class
-    for eachobservation in acis_and_cti_obs:
-        # Pull the obsid from the observation and turn it into a string
-
-        obsid = str(extract_and_filter.get_obsid(eachobservation))
-        # See if it's in the sensitive list. If so, indicate whether or
-        # not this observation is FP Senstive in the new list. This will be
-        # used later in make_viols to catch violations.
-        if obsid in list_of_sensitive_obs:
-            eachobservation.append(True)
-        else:
-            eachobservation.append(False)
-
-        obs_with_sensitivity.append(eachobservation)
-
-    #
-    # create an empty dictionary called plots to contain the returned 
-    # figures, axes 1  and axes 2 of the plot_two call
-    plots = {}
-
-    # Start time of loads being reviewed expressed in units for plotdate()
-    load_start = Ska.Matplotlib.cxctime2plotdate([tstart])[0]
-
-    #
-    # Make  plots of FPTEMP and pitch vs time 
-    #
-    #
-    # For each MSID in the loop statement, make a plot from -120 to 20
-    #   - kind of a superfluous loop in this case.
-    #
-    for fig_id, msid in enumerate(('fptemp',)):
-        #-----------------------------------------------------
-        #
-        #   PLOT 1 -  fptemp_11 plt with ylim from -120 to -90
-        # 
-        #-----------------------------------------------------
-        plots[msid] = plot_two(fig_id=fig_id + 1,
-                               x=times,
-                               y=temps[msid],
-                               x2=pointpair(states['tstart'], states['tstop']),
-                               y2=pointpair(states['pitch']),
-                               title=MSID[msid]+" (ACIS-I obs. in red; ACIS-S in green)",
-                               xlabel='Date',
-                               ylabel='Temperature (C)',
-                               ylabel2='Pitch (deg)',
-                               ylim = (-120, -90),
-                               ylim2=(40, 180),
-                               figsize=(14, 7),
-                               )
-        plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
-                                  linewidth=2.0)
-
-        plots[msid]['ax'].axvline(load_start, linestyle=':', color='g',
-                                  linewidth=2.0)
-
-        #
-        # Now plot any perigee passages that occur between xmin and xmax
-        #for eachpassage in perigee_passages:
-        paint_perigee(perigee_passages, states, plots, msid)
-
-        # Now draw horizontal lines on the plot running from start to stop
-        # and label them with the Obsid
-        ypos = -110.0
-        endcapstart =  -111.0
-        endcapstop = -109.0
-        textypos = -108.0
-        fontsize = 12
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
-                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
-
-        # Build the file name and output the plot to a file
-        filename = MSID[msid].lower() + 'M120toM90.png'
-        outfile = os.path.join(opt.outdir, filename)
-        mylog.info('Writing plot file %s' % outfile)
-        plots[msid]['fig'].savefig(outfile)
-        plots[msid]['filename'] = filename
-
-
-        #------------------------------------------------------
-        #
-        #   PLOT 2 -  fptemp_11 plt with ylim from -120 to -119
-        # 
-        #------------------------------------------------------
-        #
-        plots[msid] = plot_two(fig_id=fig_id + 1,
-                               x=times,
-                               y=temps[msid],
-                               x2=pointpair(states['tstart'], states['tstop']),
-                               y2=pointpair(states['pitch']),
-                               title=MSID[msid]+" (ACIS-I obs. in red; ACIS-S in green)",
-                               xlabel='Date',
-                               ylabel='Temperature (C)',
-                               ylabel2='Pitch (deg)',
-                               ylim = (-120, -119),
-                               ylim2=(40, 180),
-                               figsize=(14, 7),
-                               )
-
-        #
-        # Now plot any perigee passages that occur between xmin and xmax
-        #
-        paint_perigee(perigee_passages, states, plots, msid)
-
-        # Now draw horizontal lines on the plot running form start to stop
-        # and label them with the Obsid
-        ypos = -119.35
-        endcapstart = ypos + 0.05
-        endcapstop = ypos - 0.05
-        textypos = ypos + 0.05
-        fontsize = 9
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
-                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
-
-        # Build the file name and output the file
-        filename = MSID[msid].lower() + 'M120toM119.png'
-        outfile = os.path.join(opt.outdir, filename)
-        mylog.info('   Writing plot file %s' % outfile)
-        plots[msid]['fig'].savefig(outfile)
-        plots[msid]['filename'] = filename
-
-        #------------------------------------------------------
-        #
-        #   PLOT 3 -  fptemp_11 plt with ylim from -120 to -112
-        # 
-        #------------------------------------------------------
-        #
-        plots[msid] = plot_two(fig_id=fig_id + 1,
-                               x=times,
-                               y=temps[msid],
-                               x2=pointpair(states['tstart'], states['tstop']),
-                               y2=pointpair(states['pitch']),
-                               title=MSID[msid]+" (ACIS-I obs. in red; ACIS-S in green)",
-                               xlabel='Date',
-                               ylabel='Temperature (C)',
-                               ylabel2='Pitch (deg)',
-                               ylim = (-120, -111.5),
-                               ylim2=(40, 180),
-                               figsize=(14, 7),
-                               )
-        #
-        # Now plot any perigee passages that occur between xmin and xmax
-        #
-        paint_perigee(perigee_passages, states, plots, msid)
-
-        # Now draw horizontal lines on the plot running from start to stop
-        # and label them with the Obsid
-        ypos = -116
-        endcapstart =  -116.2
-        endcapstop = -115.8
-        textypos = -115.7
-        fontsize = 9
-
-        draw_obsids(opt, extract_and_filter, obs_with_sensitivity, nopref_array, 
-                    plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
-
-        # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-        plots[msid]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
-        # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-        plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
-        # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-        plots[msid]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
- 
-        # Build the file name and output the file
-        filename = MSID[msid].lower() + 'M120toM112.png'
-        outfile = os.path.join(opt.outdir, filename)
-        mylog.info('   Writing plot file %s' % outfile)
-        plots[msid]['fig'].savefig(outfile)
-        plots[msid]['filename'] = filename
-
-    # end of for fig_id, msid in enumerate(('fptemp',)):
-
-    # Now create the plot of ACIS CCD number and Sim-Z position
-    plots['pow_sim'] = plot_two(
-        fig_id=fig_id + 1,
-        title='ACIS CCDs and SIM-Z position',
-        xlabel='Date',
-        x=pointpair(states['tstart'], states['tstop']),
-        y=pointpair(states['ccd_count']),
-        ylabel='CCD_COUNT',
-        ylim=(-0.1, 6.1),
-        x2=pointpair(states['tstart'], states['tstop']),
-        y2=pointpair(states['simpos']),
-        ylabel2='SIM-Z (steps)',
-        ylim2=(-105000, 105000),
-        )
-    plots['pow_sim']['ax'].axvline(load_start, linestyle=':', color='g',
-                                   linewidth=1.0)
-    plots['pow_sim']['fig'].subplots_adjust(right=0.85)
-    filename = 'pow_sim.png'
-    outfile = os.path.join(opt.outdir, filename)
-    mylog.info('   Writing plot file %s' % outfile)
-    plots['pow_sim']['fig'].savefig(outfile)
-    plots['pow_sim']['filename'] = filename
-
-    return plots, obs_with_sensitivity
 
 def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
