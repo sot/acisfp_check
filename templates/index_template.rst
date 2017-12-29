@@ -88,7 +88,7 @@ No ECS Observation -118.7 deg C FP_TEMP Violations
 
 
 
-.. image:: {{plots.fptemp.filename}}
+.. image:: {{plots.acisfp.filename}}
 .. image:: {{plots.pow_sim.filename}}
 
 =========================
