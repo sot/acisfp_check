@@ -50,21 +50,21 @@ default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 #
 # INIT
 #
-MSID = {"fptemp": "FPTEMP"}
-YELLOW = {"fptemp": -50.0}
-MARGIN = {"fptemp": 2.5}
+MSID = {"acisfp": "FPTEMP"}
+YELLOW = {"acisfp": -50.0}
+MARGIN = {"acisfp": 2.5}
 
 # This is the cutoff temperature for any FPTEMP sensitive observation
 # if the FP temp goes above this number, and the obswervation is sensitive to
 # the focal plane temperature, it has to be flagged
-FP_TEMP_SENSITIVE = {"fptemp": -118.7}
-FP_TEMP_MINIMUM = {"fptemp": -118.7}
+FP_TEMP_SENSITIVE = {"acisfp": -118.7}
+FP_TEMP_MINIMUM = {"acisfp": -118.7}
 
 # This is the new maximum temperature for all ACIS-S observations (4/26/16)
-ACIS_S_RED = {"fptemp": -112.0}
+ACIS_S_RED = {"acisfp": -112.0}
 
 # ACIS-I max temperatures remain at -114 deg. C
-ACIS_I_RED = {"fptemp": -114.0}
+ACIS_I_RED = {"acisfp": -114.0}
 
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
@@ -398,7 +398,7 @@ class ACISFPCheck(ACISThermalCheck):
             if str(eandf.get_obsid(eachobs)) not in nopref_list:
                 fp_sense_without_noprefs.append(eachobs)
 
-        temp = temps[self.msid]
+        temp = temps[self.name]
 
         # ------------------------------------
         #  CTI-ONLY, -118.7 violation check
@@ -407,7 +407,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        plan_limit = FP_TEMP_SENSITIVE[self.msid]
+        plan_limit = FP_TEMP_SENSITIVE[self.name]
         cti_viols = search_obsids_for_viols(self.msid, plan_limit, cti_only_obs, 
                                             temp, times)
 
@@ -417,7 +417,7 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
         # Set the limit for those observations that are sensitive to the FP Temp
-        plan_limit = FP_TEMP_SENSITIVE[self.msid]
+        plan_limit = FP_TEMP_SENSITIVE[self.name]
 
         fp_sens_viols = search_obsids_for_viols(self.msid, plan_limit, 
                                                 fp_sense_without_noprefs, temp, times)
@@ -430,7 +430,7 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
         # Set the limit 
-        plan_limit = ACIS_S_RED[self.msid]
+        plan_limit = ACIS_S_RED[self.name]
         ACIS_S_viols = search_obsids_for_viols(self.msid, plan_limit, 
                                                ACIS_S_obs, temp, times)
 
@@ -442,7 +442,7 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # set the planning limit to the -114 C Red limit for ACIS-I observations
-        plan_limit = ACIS_I_RED[self.msid]
+        plan_limit = ACIS_I_RED[self.name]
 
         # Create the violation data structure.
         ACIS_I_viols = search_obsids_for_viols(self.msid, plan_limit, 
@@ -469,6 +469,7 @@ class ACISFPCheck(ACISThermalCheck):
         """
         Make output plots.
     
+        :param outdir: the directory to which the products are written
         :param states: commanded states
         :param times: time stamps (sec) for temperature arrays
         :param temps: dict of temperatures
@@ -562,7 +563,7 @@ class ACISFPCheck(ACISThermalCheck):
         # For each MSID in the loop statement, make a plot from -120 to 20
         #   - kind of a superfluous loop in this case.
         #
-        for fig_id, msid in enumerate(('fptemp',)):
+        for fig_id, msid in enumerate((self.name,)):
             # -----------------------------------------------------
             #
             #   PLOT 1 -  fptemp_11 plt with ylim from -120 to -90
@@ -586,7 +587,7 @@ class ACISFPCheck(ACISThermalCheck):
             # Add a vertical line to mark the start time of the load
             plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
                                       linewidth=2.0)
-    
+
             #
             # Now plot any perigee passages that occur between xmin and xmax
             # for eachpassage in perigee_passages:
@@ -971,8 +972,8 @@ def process_nopref_list(filespec=default_nopref_list):
     # For each line in the file......
     for line in nopreflist.readlines():
 
-        # split the line out into it's constiutent parts
-        splitline = line.split()
+        # split the line out into it's constituent parts
+        splitline = line.encode().split()
 
         # If the line is NOT a comment (i.e. does not start with a "#")
         if splitline[0][0] != '#':
@@ -997,7 +998,7 @@ def main():
                                MARGIN, VALIDATION_LIMITS, HIST_LIMIT, 
                                calc_model, other_telem=['1dahtbon'],
                                other_map={'1dahtbon': 'dh_heater', 
-                                          "fptemp_11": "fp_temp"})
+                                          "fptemp_11": "fptemp"})
     try:
         acisfp_check.driver(args, state_builder)
     except Exception as msg:
