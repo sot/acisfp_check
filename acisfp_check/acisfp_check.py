@@ -42,7 +42,7 @@ import sys
 # Import ACIS-specific observation extraction, filtering 
 # and attribute support routines.
 #
-from acisfp_check.acis_obs import ObsidFindFilter
+from .acis_obs import ObsidFindFilter
 
 model_path = os.path.abspath(os.path.dirname(__file__))
 default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
@@ -571,29 +571,34 @@ class ACISFPCheck(ACISThermalCheck):
             #   PLOT 1 -  fptemp_11 plt with ylim from -120 to -90
             # 
             # -----------------------------------------------------
-            plots[msid] = plot_two(fig_id=fig_id + 1,
-                                   x=times,
-                                   y=temps[msid],
-                                   x2=pointpair(states['tstart'], states['tstop']),
-                                   y2=pointpair(states['pitch']),
-                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                   xlabel='Date',
-                                   ylabel='Temperature (C)',
-                                   ylabel2='Pitch (deg)',
-                                   ylim=(-120, -90),
-                                   ylim2=(40, 180),
-                                   figsize=(14, 7),
-                                   )
-            plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
-                                      linewidth=2.0)
+            plots[msid+"_1"] = plot_two(fig_id=fig_id + 1,
+                                        x=times,
+                                        y=temps[msid],
+                                        x2=pointpair(states['tstart'], states['tstop']),
+                                        y2=pointpair(states['pitch']),
+                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                        xlabel='Date',
+                                        ylabel='Temperature (C)',
+                                        ylabel2='Pitch (deg)',
+                                        ylim=(-120, -90),
+                                        ylim2=(40, 180),
+                                        figsize=(14, 7),
+                                        )
+            plots[msid+"_1"]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
+                                           linewidth=2.0)
             # Add a vertical line to mark the start time of the load
-            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
-                                      linewidth=2.0)
+            plots[msid+"_1"]['ax'].axvline(load_start, linestyle='-', color='g',
+                                           linewidth=2.0)
+
+            # The next line is to ensure that the width of the axes
+            # of all the weekly prediction plots are the same--used
+            # later down in the function
+            w1, h1 = plots[msid+"_1"]['fig'].get_size_inches()
 
             #
             # Now plot any perigee passages that occur between xmin and xmax
             # for eachpassage in perigee_passages:
-            paint_perigee(perigee_passages, states, plots, msid)
+            paint_perigee(perigee_passages, states, plots, msid+"_1")
     
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
@@ -603,14 +608,14 @@ class ACISFPCheck(ACISThermalCheck):
             textypos = -108.0
             fontsize = 12
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, fontsize)
     
             # Build the file name and output the plot to a file
             filename = MSID[msid].lower() + 'M120toM90.png'
             outfile = os.path.join(outdir, filename)
             mylog.info('Writing plot file %s' % outfile)
-            plots[msid]['fig'].savefig(outfile)
-            plots[msid]['filename'] = filename
+            plots[msid+"_1"]['fig'].savefig(outfile)
+            plots[msid+"_1"]['filename'] = filename
     
             # ------------------------------------------------------
             #
@@ -618,27 +623,33 @@ class ACISFPCheck(ACISThermalCheck):
             # 
             # ------------------------------------------------------
             #
-            plots[msid] = plot_two(fig_id=fig_id + 1,
-                                   x=times,
-                                   y=temps[msid],
-                                   x2=pointpair(states['tstart'], states['tstop']),
-                                   y2=pointpair(states['pitch']),
-                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                   xlabel='Date',
-                                   ylabel='Temperature (C)',
-                                   ylabel2='Pitch (deg)',
-                                   ylim=(-120, -119),
-                                   ylim2=(40, 180),
-                                   figsize=(14, 7),
-                                   )
+            plots[msid+"_2"] = plot_two(fig_id=fig_id + 1,
+                                        x=times,
+                                        y=temps[msid],
+                                        x2=pointpair(states['tstart'], states['tstop']),
+                                        y2=pointpair(states['pitch']),
+                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                        xlabel='Date',
+                                        ylabel='Temperature (C)',
+                                        ylabel2='Pitch (deg)',
+                                        ylim=(-120, -119),
+                                        ylim2=(40, 180),
+                                        figsize=(14, 7),
+                                        )
             # Add a vertical line to mark the start time of the load
-            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
-                                      linewidth=2.0)
+            plots[msid+"_2"]['ax'].axvline(load_start, linestyle='-', color='g',
+                                           linewidth=2.0)
+            # The next several lines ensure that the width of the axes
+            # of all the weekly prediction plots are the same.
+            w2, h2 = plots[msid+"_2"]['fig'].get_size_inches()
+            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
+            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
+            plots[msid+"_2"]['fig'].subplots_adjust(left=lm, right=rm)
 
             #
             # Now plot any perigee passages that occur between xmin and xmax
             #
-            paint_perigee(perigee_passages, states, plots, msid)
+            paint_perigee(perigee_passages, states, plots, msid+"_2")
     
             # Now draw horizontal lines on the plot running form start to stop
             # and label them with the Obsid
@@ -648,14 +659,14 @@ class ACISFPCheck(ACISThermalCheck):
             textypos = ypos + 0.05
             fontsize = 9
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, fontsize)
     
             # Build the file name and output the file
             filename = MSID[msid].lower() + 'M120toM119.png'
             outfile = os.path.join(outdir, filename)
             mylog.info('   Writing plot file %s' % outfile)
-            plots[msid]['fig'].savefig(outfile)
-            plots[msid]['filename'] = filename
+            plots[msid+"_2"]['fig'].savefig(outfile)
+            plots[msid+"_2"]['filename'] = filename
     
             # ------------------------------------------------------
             #
@@ -663,26 +674,33 @@ class ACISFPCheck(ACISThermalCheck):
             # 
             # ------------------------------------------------------
             #
-            plots[msid] = plot_two(fig_id=fig_id + 1,
-                                   x=times,
-                                   y=temps[msid],
-                                   x2=pointpair(states['tstart'], states['tstop']),
-                                   y2=pointpair(states['pitch']),
-                                   title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                   xlabel='Date',
-                                   ylabel='Temperature (C)',
-                                   ylabel2='Pitch (deg)',
-                                   ylim=(-120, -111.5),
-                                   ylim2=(40, 180),
-                                   figsize=(14, 7),
-                                   )
+            plots[msid+"_3"] = plot_two(fig_id=fig_id + 1,
+                                        x=times,
+                                        y=temps[msid],
+                                        x2=pointpair(states['tstart'], states['tstop']),
+                                        y2=pointpair(states['pitch']),
+                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                        xlabel='Date',
+                                        ylabel='Temperature (C)',
+                                        ylabel2='Pitch (deg)',
+                                        ylim=(-120, -111.5),
+                                        ylim2=(40, 180),
+                                        figsize=(14, 7),
+                                        )
             # Add a vertical line to mark the start time of the load
-            plots[msid]['ax'].axvline(load_start, linestyle='-', color='g',
-                                      linewidth=2.0)
+            plots[msid+"_3"]['ax'].axvline(load_start, linestyle='-', color='g',
+                                           linewidth=2.0)
+            # The next several lines ensure that the width of the axes                                             
+            # of all the weekly prediction plots are the same.                                                      
+            w2, h2 = plots[msid+"_3"]['fig'].get_size_inches()
+            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
+            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
+            plots[msid+"_3"]['fig'].subplots_adjust(left=lm, right=rm)
+
             #
             # Now plot any perigee passages that occur between xmin and xmax
             #
-            paint_perigee(perigee_passages, states, plots, msid)
+            paint_perigee(perigee_passages, states, plots, msid+"_3")
     
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
@@ -693,21 +711,28 @@ class ACISFPCheck(ACISThermalCheck):
             fontsize = 9
     
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid, ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_3", ypos, endcapstart, endcapstop, textypos, fontsize)
     
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-            plots[msid]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
+            plots[msid+"_3"]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-            plots[msid]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
+            plots[msid+"_3"]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
             # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-            plots[msid]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
+            plots[msid+"_3"]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
     
+            # The next several lines ensure that the width of the axes                                                
+            # of all the weekly prediction plots are the same.                                                       
+            w2, h2 = plots[msid+"_3"]['fig'].get_size_inches()
+            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
+            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
+            plots[msid+"_3"]['fig'].subplots_adjust(left=lm, right=rm)
+
             # Build the file name and output the file
             filename = MSID[msid].lower() + 'M120toM112.png'
             outfile = os.path.join(outdir, filename)
             mylog.info('   Writing plot file %s' % outfile)
-            plots[msid]['fig'].savefig(outfile)
-            plots[msid]['filename'] = filename
+            plots[msid+"_3"]['fig'].savefig(outfile)
+            plots[msid+"_3"]['filename'] = filename
     
         # end of for fig_id, msid in enumerate(('fptemp',)):
     
@@ -728,7 +753,13 @@ class ACISFPCheck(ACISThermalCheck):
         # Add a vertical line to mark the start time of the load
         plots['pow_sim']['ax'].axvline(load_start, linestyle='-', color='g',
                                        linewidth=2.0)
-        plots['pow_sim']['fig'].subplots_adjust(right=0.85)
+        # The next several lines ensure that the width of the axes                                              
+        # of all the weekly prediction plots are the same.                                                   
+        w2, h2 = plots["pow_sim"]['fig'].get_size_inches()
+        lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
+        rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
+        plots["pow_sim"]['fig'].subplots_adjust(left=lm, right=rm)
+
         filename = 'pow_sim.png'
         outfile = os.path.join(outdir, filename)
         mylog.info('   Writing plot file %s' % outfile)
