@@ -273,11 +273,11 @@ class ObsidFindFilter():
                           'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
 
         # a little initialization
-        firstpow = ''
+        firstpow = None
         DOYfetchstart = ' '
-        obsid = ''
-        xtztime = ''
-        aa0time = ''
+        obsid = None
+        xtztime = None
+        aa0time = None
         exptime = '-1'
         pitch = ''
         ccdcnt = ''
@@ -297,18 +297,18 @@ class ObsidFindFilter():
 
             # is this the first WSPOW of the interval?
             if (eachstate.power_cmd == 'WSPOW00000' or eachstate.power_cmd == 'WSVIDALLDN') and \
-               firstpow == '':
+               firstpow is None:
                 firstpow = eachstate
                 DOYfetchstart = eachstate.datestart
                 secsfetchstart = DateTime(DOYfetchstart).secs
 
             # Process the first XTZ0000005 line you see
-            if (eachstate.power_cmd == 'XTZ0000005' or eachstate.power_cmd == 'XCZ0000005' ) and \
-               (xtztime == '' and firstpow != ''):
+            if (eachstate.power_cmd == 'XTZ0000005' or eachstate.power_cmd == 'XCZ0000005') and \
+               (xtztime is None and firstpow is not None):
                 xtztime = DateTime(eachstate.datestart).secs
 
             # Process the first NPNT line you see
-            if obsid == '' and firstpow != '':
+            if obsid is None and firstpow is not None:
                 obsid = eachstate.obsid
                 power_cmd = eachstate.power_cmd 
                 si_mode = eachstate.si_mode
@@ -333,13 +333,13 @@ class ObsidFindFilter():
                 dither = eachstate.dither
 
             # Process the first AA00000000 line you see
-            if eachstate.power_cmd == 'AA00000000' and aa0time == '' and firstpow != '':
+            if eachstate.power_cmd == 'AA00000000' and aa0time is None and firstpow is not None:
                 aa0time = DateTime(eachstate.datestart).secs
                 DOYfetchstop = eachstate.datestop
                 secsfetchstop = DateTime(DOYfetchstop).secs
 
                 # now calculate the exposure time
-                if xtztime != '':
+                if xtztime is not None:
                     exptime = round(float(aa0time)) - round(float(xtztime))
                 else:
                     exptime = -1
@@ -377,11 +377,11 @@ class ObsidFindFilter():
                                                  science_instrument])
 
                 # now  clear out the data values
-                firstpow = ''
+                firstpow = None
                 DOYfetchstart = ' '
-                obsid = ''
-                xtztime = ''
-                aa0time = ''
+                obsid = None
+                xtztime = None
+                aa0time = None
                 exptime = '-1'
                 pitch = ''
                 DOYfetchstop= ' '
