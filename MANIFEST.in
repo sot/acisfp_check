@@ -1,1 +1,3 @@
 include acisfp_check/acisfp_model_spec.json
+include acisfp_check/FPS_NoPref.txt
+include acisfp_check/templates/*

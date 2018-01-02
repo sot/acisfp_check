@@ -326,7 +326,7 @@ class ACISFPCheck(ACISThermalCheck):
                    'fp_sens_viols': pred["fp_sens_viols"],
                    'cti_viols': pred["cti_viols"]}
 
-        template_path = os.path.join(model_path, '..', 'templates')
+        template_path = os.path.join(model_path, 'templates')
 
         self.write_index_rst(self.bsdir, args.outdir, context, 
                              template_path=template_path)
