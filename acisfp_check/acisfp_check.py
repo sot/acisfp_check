@@ -116,7 +116,8 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
     model.comp['sim_z'].set_data(states['simpos'], times)
     model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
 
-    model.comp['roll'].set_data(calc_off_nom_rolls(states), times)
+    if "roll" in model.comp:
+        model.comp['roll'].set_data(calc_off_nom_rolls(states), times)
 
     for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
         model.comp[name].set_data(states[name], times)
@@ -933,9 +934,9 @@ def draw_obsids(extract_and_filter,
             this_obsid = extract_and_filter.get_obsid(eachobservation)
 
             # But if it's also in the nopref list AND the upcased CandS_status entry is "NO PREF"
-            where_words = np.where(nopref_array['obsid'] == str(this_obsid))[0][0]
+            where_words = np.where(nopref_array['obsid'] == str(this_obsid))
             if str(this_obsid) in nopref_array['obsid'] and \
-               nopref_array['CandS_status'][where_words].upper()[:7] == 'NO_PREF':
+               nopref_array['CandS_status'][where_words[0][0]].upper()[:7] == 'NO_PREF':
                 color = 'purple'
                 obsid = obsid + ' * NO PREF *'
             else:
