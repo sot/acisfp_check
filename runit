@@ -1,1 +1,0 @@
-/proj/sot/ska/bin//python /home/gregg/FPMODEL/acisfp_check/acisfp_check.py --oflsdir=/data/acis/LoadReviews/2016/$1/ofls --outdir=/home/gregg/FPMODEL/acisfp_check/CRM/ --model-spec=/home/gregg/FPMODEL/acisfp_check/acisfp_spec.json --verbose=2

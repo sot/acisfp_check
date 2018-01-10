@@ -14,8 +14,8 @@ Summary
 .. class:: borderless
 
 ====================  =============================================
-{% if opt.loaddir %}
-Load directory        {{opt.loaddir}}
+{% if bsdir %}
+Load directory        {{bsdir}}
 {% endif %}
 Run time              {{proc.run_time}} by {{proc.run_user}}
 Run log               `<run.dat>`_
@@ -50,23 +50,25 @@ Validation Violations
    :widths: 15, 10, 10, 10
 
 {% for viol in valid_viols %}
-   {{viol.msid}},{{viol.quant}},{{viol.value}},{{viol.limit|floatformat:2}}
+   {{viol.msid}},{{viol.quant}},{{viol.value}},{{"%.2f"|format(viol.limit)}}
 {% endfor%}
 
 {% else %}
 No Validation Violations
-{% endif %}    
-
-
+{% endif %}
+   
 {% for plot in plots_validation %}
 {{ plot.msid }}
 -----------------------
 
-Note: DPA residual histograms include only points where 1DPAMZT > 20 degC.
 
 Red = telemetry, blue = model
 
 .. image:: {{plot.lines}}
+
+Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
+-----------------------------------------------------------------------
+
 .. image:: {{plot.histlog}}
 .. image:: {{plot.histlin}}
 

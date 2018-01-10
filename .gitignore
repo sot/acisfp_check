@@ -1,0 +1,6 @@
+build
+dist
+*.pyc
+acisfp_check.egg-info
+doc/_build
+*~

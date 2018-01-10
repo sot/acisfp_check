@@ -1,24 +1,25 @@
+from __future__ import print_function
 ###############################################################################
 #
-#   ObsidFindFilter.py - Class that will extract CHANDRA ACIS OBSIDs using  
+#   ObsidFindFilter - Class that will extract CHANDRA ACIS OBSIDs using
 #                        the commanded states database. Also provided are
-#                        a series of filters the user can use to select 
+#                        a series of filters the user can use to select
 #                        Observations of a particular configuration.
 #
 #                        These filters are: Exposure time range
 #                                           CCD Count range
 #                                           CTI observation removal
 #                                           Pitch range
-#                                           
-#     
+#
+#
 #                        Users must supply a start and stop time for extraction
 #                        of states from the Commanded States Data base
 #
 ###############################################################################
-import Chandra.Time
+from Chandra.Time import DateTime
 import Ska.engarchive.fetch_sci as fetch
-import Chandra.cmd_states
 from Ska.DBI import DBI
+
 #------------------------------------------------------------------
 #
 # get_last_data_date
@@ -30,52 +31,48 @@ def get_last_data_date():
     SKA Engineering Archive
     """
     tdata = fetch.MSID('1DPAMZT', '2012:100', '2024:364')
-    lag_date = Chandra.Time.DateTime(tdata.times[-1]).date
-    return(lag_date)
+    return DateTime(tdata.times[-1]).date
 
 #----------------------------------------------------------------
 #
-# who_in_fp.py               
+# who_in_fp.py
 #
 #----------------------------------------------------------------
-def who_in_fp(simpos = 80655):
+def who_in_fp(simpos=80655):
     """
     Returns a string telling you which instrument is in 
-    the Focal Plane. "launchlock" is returned because that's a position we never expect to see 
-    the sim in - it's an indicator to the user that there's a problem.
+    the Focal Plane. "launchlock" is returned because that's a 
+    position we never expect to see the sim in - it's an indicator 
+    to the user that there's a problem.
 
-    Also, The ranges for detector sections use the max and min hard stop locations, and they
-    also split the difference between "I" and "S" for each instrument.
-     
+    Also, The ranges for detector sections use the max and min hard 
+    stop locations, and they also split the difference between "I" 
+    and "S" for each instrument.
+
           input: - TSC position (simpos) - INTEGER
-     
+
           output - String indicating what is in the focal plane
                    "launchlock" - default
                    "ACIS-I"
                    "ACIS-S"
-                   "HRC-I"        self.list_of_sensitive_obs
-
+                   "HRC-I"
                    "HRC-S"
     """
     is_in_the_fp = 'launchlock'
 
     #  Set the value of is_in_the_fp to the appropriate value. It will default
     #  to "launchlock" if no value matches
-    #
-    if ((simpos >= 82109) and (simpos <= 104839)):
+    if 104839 >= simpos >= 82109:
         is_in_the_fp = 'ACIS-I'
-    elif ((simpos >= 70736) and (simpos <= 82108)):
+    elif 82108 >= simpos >= 70736:
         is_in_the_fp = 'ACIS-S'
-    elif ((simpos >= -86147) and (simpos <= -20000)):
+    elif -20000 >= simpos >= -86147:
         is_in_the_fp = 'HRC-I'
-    elif ((simpos >= -104362) and (simpos <= -86148)):
+    elif -86148 >= simpos >= -104362:
         is_in_the_fp = 'HRC-S'
 
     #  return the string indicating which instrument is in the Focal Plane
-    #
     return is_in_the_fp
-
-
 
 class ObsidFindFilter():
 
@@ -121,78 +118,78 @@ class ObsidFindFilter():
 
         self.list_of_sensitive_obs = []
 
-    #--------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     #
     #  cmd_states_fetch
     #
-    #--------------------------------------------------------------------------
+    #   --------------------------------------------------------------------------
     def cmd_states_fetch(self, tbegin, tend):
         """
         Search the TA database and retrieve all the command
                          state data between the given start/stop times.
-     
+
         Returned - numpy array. Data types are:
-     
+
              Data item and type
              ------------------
-             ('datestart', '|S21'), 
-             ('datestop', '|S21'), 
-             ('tstart', '<f8'), 
-             ('tstop', '<f8'), 
-             ('obsid', '<i8'), 
-             ('power_cmd', '|S10'), 
-             ('si_mode', '|S8'), 
-             ('pcad_mode', '|S4'), 
-             ('vid_board', '<i8'), 
-             ('clocking', '<i8'), 
-             ('fep_count', '<i8'), 
-             ('ccd_count', '<i8'), 
-             ('simpos', '<i8'), 
-             ('simfa_pos', '<i8'), 
-             ('pitch', '<f8'), 
-             ('ra', '<f8'), 
-             ('dec', '<f8'), 
-             ('roll', '<f8'), 
-             ('q1', '<f8'), 
-             ('q2', '<f8'), 
-             ('q3', '<f8'), 
+             ('datestart', '|S21'),
+             ('datestop', '|S21'),
+             ('tstart', '<f8'),
+             ('tstop', '<f8'),
+             ('obsid', '<i8'),
+             ('power_cmd', '|S10'),
+             ('si_mode', '|S8'),
+             ('pcad_mode', '|S4'),
+             ('vid_board', '<i8'),
+             ('clocking', '<i8'),
+             ('fep_count', '<i8'),
+             ('ccd_count', '<i8'),
+             ('simpos', '<i8'),
+             ('simfa_pos', '<i8'),
+             ('pitch', '<f8'),
+             ('ra', '<f8'),
+             ('dec', '<f8'),
+             ('roll', '<f8'),
+             ('q1', '<f8'),
+             ('q2', '<f8'),
+             ('q3', '<f8'),
              ('q4', '<f8'),
-             ('trans_keys', '|S48')]
-             ('hetg', '|S4'), 
-             ('letg', '|S4'), 
-             ('dither', '|S4')])
+             ('trans_keys', '|S48')
+             ('hetg', '|S4'),
+             ('letg', '|S4'),
+             ('dither', '|S4')
 
         """
         # convert begin and end into sybase query tstart and tstop
-        tstart = Chandra.Time.DateTime(tbegin)
-        tstop =   Chandra.Time.DateTime(tend)
+        tstart = DateTime(tbegin)
+        tstop = DateTime(tend)
         #
-        #form the query for everything, starting from tstart date to now
+        # form the query for everything, starting from tstart date to now
         #
-        query = ( """select * from cmd_states where datestart >= '%s' and datestop <= '%s' order by datestart asc """  % ( tstart.date, tstop.date ) )
+        query = """select * from cmd_states where datestart >= '%s'
+                   and datestop <= '%s' order by datestart asc """ % (tstart.date, tstop.date)
         #
         # set up a read to the data base
         #
         aca_read_db = DBI(dbi='sybase', server='sybase', user='aca_read', database='aca') 
 
         #  Fetch all the data
-        self.cmd_states = aca_read_db.fetchall( query )
+        self.cmd_states = aca_read_db.fetchall(query)
  
         return self.cmd_states
 
-
-    #----------------------------------------------------------------------
+    # ---------------------------------------------------------------------
     #
     # find_obsid_intervals
-    #                                
-    #---------------------------------------------------------------------
-    def find_obsid_intervals(self, cmd_states, outfilespec = None):
+    #
+    # ---------------------------------------------------------------------
+    def find_obsid_intervals(self, cmd_states, outfilespec=None):
         """
         User reads the SKA commanded states archive, via 
         a call to the SKA get_cmd_states, between the
         user specified START and STOP times. The following
         items are returned as a numpy array:
-                
+
              Data item and type
              ------------------
              ('datestart', '|S21'), 
@@ -265,19 +262,22 @@ class ObsidFindFilter():
         #
         # Some inits
         #
-        min_exptime = 30000
+        min_exptime = 30000.0
 
         # Open the output file, and write out a header
         if outfilespec != None:
             outfile = open(outfilespec, 'w')
-            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL  Q1 Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
+            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD '
+                          'SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT '
+                          'CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL Q1 '
+                          'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
 
         # a little initialization
-        firstpow = ''
+        firstpow = None
         DOYfetchstart = ' '
-        obsid = ''
-        xtztime = ''
-        aa0time = ''
+        obsid = None
+        xtztime = None
+        aa0time = None
         exptime = '-1'
         pitch = ''
         ccdcnt = ''
@@ -297,20 +297,18 @@ class ObsidFindFilter():
 
             # is this the first WSPOW of the interval?
             if (eachstate.power_cmd == 'WSPOW00000' or eachstate.power_cmd == 'WSVIDALLDN') and \
-               (firstpow == ''):
+               firstpow is None:
                 firstpow = eachstate
                 DOYfetchstart = eachstate.datestart
-                secsfetchstart = Chandra.Time.DateTime(DOYfetchstart).secs
+                secsfetchstart = DateTime(DOYfetchstart).secs
 
             # Process the first XTZ0000005 line you see
-            if (eachstate.power_cmd == 'XTZ0000005' or eachstate.power_cmd == 'XCZ0000005' ) and \
-               ( xtztime == '' and firstpow != ''):
-                xtztime = Chandra.Time.DateTime(eachstate.datestart).secs
+            if (eachstate.power_cmd == 'XTZ0000005' or eachstate.power_cmd == 'XCZ0000005') and \
+               (xtztime is None and firstpow is not None):
+                xtztime = DateTime(eachstate.datestart).secs
 
             # Process the first NPNT line you see
-#            if (eachstate.pcad_mode == 'NPNT' and obsid == '') and (firstpow != ''):
-            if (obsid == '') and (firstpow != ''):
-#            if (firstpow != ''):
+            if obsid is None and firstpow is not None:
                 obsid = eachstate.obsid
                 power_cmd = eachstate.power_cmd 
                 si_mode = eachstate.si_mode
@@ -335,13 +333,13 @@ class ObsidFindFilter():
                 dither = eachstate.dither
 
             # Process the first AA00000000 line you see
-            if eachstate.power_cmd == 'AA00000000' and aa0time == '' and firstpow != '':
-                aa0time = Chandra.Time.DateTime(eachstate.datestart).secs
+            if eachstate.power_cmd == 'AA00000000' and aa0time is None and firstpow is not None:
+                aa0time = DateTime(eachstate.datestart).secs
                 DOYfetchstop = eachstate.datestop
-                secsfetchstop = Chandra.Time.DateTime(DOYfetchstop).secs
+                secsfetchstop = DateTime(DOYfetchstop).secs
 
                 # now calculate the exposure time
-                if xtztime != '':
+                if xtztime is not None:
                     exptime = round(float(aa0time)) - round(float(xtztime))
                 else:
                     exptime = -1
@@ -351,7 +349,7 @@ class ObsidFindFilter():
                 # add on the exposure time and the text version of who is in
                 # the focal plane
                 science_instrument = who_in_fp(simpos)
-  
+
                 self.obsid_interval_list.append([DOYfetchstart, 
                                                  DOYfetchstop, 
                                                  secsfetchstart, 
@@ -379,14 +377,15 @@ class ObsidFindFilter():
                                                  science_instrument])
 
                 # now  clear out the data values
-                firstpow = ''
+                firstpow = None
                 DOYfetchstart = ' '
-                obsid = ''
-                xtztime = ''
-                aa0time = ''
+                obsid = None
+                xtztime = None
+                aa0time = None
                 exptime = '-1'
                 pitch = ''
                 DOYfetchstop= ' '
+
         # End of LOOP for eachstate in cmd_states:
 
         # Write out the OBSID interval list and return it upon exit
@@ -434,7 +433,7 @@ class ObsidFindFilter():
                cmd_states = cmd_statesFetch(start_time, stop_time)
                OBSIDIntervals = FindObsidIntervals(cmd_states, '')
      
-          expintervals = ExpTimeFilter(OBSIDIntervals, [min_exp_length, <max_exp_length>])
+        expintervals = ExpTimeFilter(OBSIDIntervals, [min_exp_length, <max_exp_length>])
         """
         exptimelist = []
 
@@ -448,8 +447,7 @@ class ObsidFindFilter():
             max_exp_length = startstoplist[1]
 
         for eachinterval in obsidinterval_list:
-            if (eachinterval[self.exptime] >= min_exp_length) and \
-               (eachinterval[self.exptime] <= max_exp_length):
+            if max_exp_length >= eachinterval[self.exptime] >= min_exp_length:
                 exptimelist.append(eachinterval)
 
         return exptimelist
@@ -525,7 +523,7 @@ class ObsidFindFilter():
                        stop_time  = '2010:014' 
                        cmd_states = cmd_statesFetch(start_time, stop_time)
                        OBSIDIntervals = FindObsidIntervals(cmd_states, 'junk.dat')
-     
+
           pitchintervals = PitchFilter(OBSIDIntervals, [min_pitch, <max_pitch>])
         """
         pitchlist = []
@@ -539,7 +537,7 @@ class ObsidFindFilter():
             maxpitch = pitchrangelist[1]
 
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.pitch] >= minpitch and eachinterval[self.pitch] < maxpitch:
+            if maxpitch > eachinterval[self.pitch] >= minpitch:
                 pitchlist.append(eachinterval)
 
         return pitchlist
@@ -564,7 +562,7 @@ class ObsidFindFilter():
                                               [min_count, <max_count>])
 
              OBSIDIntervals - Interval list to be searched
-    
+
              [min_count, <max_count>] - List containing the min and max counts
                                         If the list contains only one count,
                                         return all intervals whose count
@@ -590,7 +588,7 @@ class ObsidFindFilter():
            maxcount = ccdcountrangelist[1]
 
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.ccd_count] >= mincount and eachinterval[self.ccd_count] <= maxcount:
+            if maxcount >= eachinterval[self.ccd_count] >= mincount:
                 ccdcountlist.append(eachinterval)
 
         return ccdcountlist
@@ -610,11 +608,10 @@ class ObsidFindFilter():
         """
         acis_and_cti_only = []
         for eachobservation in obsidinterval_list:
-            if  ( ((eachobservation[self.in_focal_plane] == "ACIS-I") or \
-                  (eachobservation[self.in_focal_plane] == "ACIS-S")) or \
-                  (eachobservation[self.obsid] >= 50000) ):
+            if eachobservation[self.in_focal_plane].startswith("ACIS-") or \
+               eachobservation[self.obsid] >= 50000:
                 acis_and_cti_only.append(eachobservation)
-        return(acis_and_cti_only)
+        return acis_and_cti_only
 
 
     #--------------------------------------------------------------------------
@@ -630,10 +627,10 @@ class ObsidFindFilter():
         """
         cti_only = []
         for eachobservation in obsidinterval_list:
-            if  (eachobservation[self.obsid] >= 50000)and\
-                (eachobservation[self.in_focal_plane] == "HRC-S"):
+            if eachobservation[self.obsid] >= 50000 and \
+               eachobservation[self.in_focal_plane] == "HRC-S":
                 cti_only.append(eachobservation)
-        return(cti_only)
+        return cti_only
 
 
     #--------------------------------------------------------------------------
@@ -650,10 +647,10 @@ class ObsidFindFilter():
         """
         fp_only = []
         for eachobservation in obsidinterval_list:
-            if  (len(eachobservation) >= self.is_fp_sensitive) and \
-                (eachobservation[self.is_fp_sensitive] == True):
+            if len(eachobservation) >= self.is_fp_sensitive and \
+               eachobservation[self.is_fp_sensitive]:
                 fp_only.append(eachobservation)
-        return(fp_only)
+        return fp_only
 
 
     #----------------------------------------------------------------------
@@ -661,7 +658,8 @@ class ObsidFindFilter():
     # general_g_i 
     #
     #---------------------------------------------------------------------
-    def general_g_i(self, start_time = '2011:001', stop_time = get_last_data_date(), numchips = [1,2,3,4,5,6], exptime = [], noCTI = False, pitchrange = []): 
+    def general_g_i(self, start_time='2011:001', stop_time=get_last_data_date(), 
+                    exptime=None, noCTI=False, pitchrange=None): 
         """
         Given: A Start and Stop time
                Exposure time range (e.g. [10000, 50000])
@@ -672,53 +670,55 @@ class ObsidFindFilter():
                  and stop_time; apply the user specified 
                  filters; then return the list
         """
-        # Step 1 - Fetch all the command states for the time interval
-        print "\ngeneral_g_i Step 1 - get the Spacecraft commands between ", start_time, " and now: ",stop_time
-        csf = self.cmd_states_fetch(start_time, stop_time )
+        if exptime is None:
+            exptime = []
+        if pitchrange is None:
+            pitchrange = []
 
+        # Step 1 - Fetch all the command states for the time interval
+        print("\ngeneral_g_i Step 1 - get the Spacecraft commands between ", 
+              start_time, " and now: ",stop_time)
+        csf = self.cmd_states_fetch(start_time, stop_time)
 
         # Step 2 - EXTRACT the OBSID Intervals (oi) from the fetched command states
         # Second argument is used as a file name to write the data to a file if you want
-        print "\ngeneral_g_i Step 2 - Find the OBSID Intervals (oi)"
+        print("\ngeneral_g_i Step 2 - Find the OBSID Intervals (oi)")
         oi = self.find_obsid_intervals(csf, ' ')
-        print "The number of oi's found is: ", len(oi)
-
+        print("The number of oi's found is: ", len(oi))
 
         # Step 3 -  Filter out all observations outside the exposure time range, 
         # if a range is given
-        print "\ngeneral_g_i Step 3 - Filter out all observations outside the exposure time range of: ", exptime
-        if exptime != []:
+        print("\ngeneral_g_i Step 3 - Filter out all observations outside "
+              "the exposure time range of: ", exptime)
+        if len(exptime) > 0:
             ei = self.exp_time_filter(oi, exptime)
         else:
             ei = oi
-            print "general_g_i Step 3 - No exposure time filtering"
-        print "Number of Observation Intervals found within the time filter: ", len(ei)
-
+            print("general_g_i Step 3 - No exposure time filtering")
+        print("Number of Observation Intervals found within the time filter: ", len(ei))
 
         # Step 4 - Filter out all CTI observations if required
         if noCTI == True:
-            print "\ngeneral_g_i Step 4 - Filter out all CTI observations"
+            print("\ngeneral_g_i Step 4 - Filter out all CTI observations")
             no_cti = self.cti_filter(ei)
         else:
-            print "\ngeneral_g_i Step 4 - *SKIPPED* Filter out all CTI observations - SKIPPED"
+            print("\ngeneral_g_i Step 4 - *SKIPPED* Filter out all CTI "
+                  "observations - SKIPPED")
             no_cti = ei
-        print "Number of observations after CTI's processing (or not) is: ", len(no_cti)
-
+        print("Number of observations after CTI's processing (or not) is: ", len(no_cti))
 
         # Step 5 - Filter based upon pitch if a pitch range is given
         if pitchrange != []:
-            print "\ngeneral_g_i Step 5 - Filtering on pitches in the range: ", pitchrange
+            print("\ngeneral_g_i Step 5 - Filtering on pitches in the range: ", pitchrange)
             pitchlist = self.pitch_filter(no_cti, pitchrange)
         else:
-            print "\ngeneral_g_i Step 5 - NO Filtering on pitches"
+            print("\ngeneral_g_i Step 5 - NO Filtering on pitches")
             pitchlist = no_cti
 
-
-        print "\n\ngeneral_g_i -----Final number of obsid's filtered is: ", len(pitchlist)
-
+        print("\n\ngeneral_g_i -----Final number of obsid's filtered is: ", len(pitchlist))
 
         # Return the list filtered on Pitch.
-        return(pitchlist)
+        return pitchlist
 
 
 
@@ -738,8 +738,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        ccd_count = observation[self.ccd_count]
-        return(ccd_count)
+        return observation[self.ccd_count]
 
     #----------------------------------------------------------------------
     #
@@ -751,8 +750,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        datestart = observation[self.datestart]
-        return(datestart)
+        return observation[self.datestart]
 
     #----------------------------------------------------------------------
     #
@@ -764,8 +762,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        datestop = observation[self.datestop]
-        return(datestop)
+        return observation[self.datestop]
 
     #----------------------------------------------------------------------
     #
@@ -777,8 +774,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        exptime = observation[self.exptime]
-        return(exptime)
+        return observation[self.exptime]
 
     #----------------------------------------------------------------------
     #
@@ -790,8 +786,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        instrument = observation[self.in_focal_plane]
-        return(instrument)
+        return observation[self.in_focal_plane]
 
     #----------------------------------------------------------------------
     #
@@ -803,10 +798,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the instruments, append to a list  and return it
         """
-        instrument_list = []
-        for eachobs in observations:
-            instrument_list.append(self.get_instrument(eachobs))
-        return(instrument_list)
+        return [self.get_instrument(eachobs) for eachobs in observations]
 
     #----------------------------------------------------------------------
     #
@@ -822,8 +814,7 @@ class ObsidFindFilter():
         for eachobs in observations:
             if eachobs[self.in_focal_plane] == instrument:
                 same_inst.append(eachobs)
-
-        return(same_inst)
+        return same_inst
 
 
     #----------------------------------------------------------------------
@@ -837,10 +828,7 @@ class ObsidFindFilter():
         class, extract the obsid and return it.
         NOTE: type(obsid) = int!!!
         """
-        obsid = None
-        if observation != []:
-            obsid = observation[self.obsid]
-        return(obsid)
+        return observation[self.obsid] if len(observation) > 0 else None
 
 
     #----------------------------------------------------------------------
@@ -853,10 +841,8 @@ class ObsidFindFilter():
         Given a list of obsids extracted by this class, loop through the 
         list and return a list of obsids.  The list contains ints
         """
-        obsid_list = []
-        for each_observation in observation_list:
-            obsid_list.append(each_observation[self.obsid])
-        return(obsid_list)
+        return [each_observation[self.obsid] 
+                for each_observation in observation_list]
 
 
     #----------------------------------------------------------------------
@@ -869,8 +855,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the obsid and return it
         """
-        pitch = observation[self.pitch]
-        return(pitch)
+        return observation[self.pitch]
 
 
     #----------------------------------------------------------------------
@@ -883,8 +868,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the sim position and return it
         """
-        sensitivity = observation[self.is_fp_sensitive]
-        return(sensitivity)
+        return observation[self.is_fp_sensitive]
 
 
     #----------------------------------------------------------------------
@@ -897,8 +881,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the sim position and return it
         """
-        sim_position = observation[self.simpos]
-        return(sim_position)
+        return observation[self.simpos]
 
     #----------------------------------------------------------------------
     #
@@ -910,8 +893,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the tstart and return it
         """
-        obs_tstart = observation[self.tstart]
-        return(obs_tstart)
+        return observation[self.tstart]
 
     #----------------------------------------------------------------------
     #
@@ -923,8 +905,7 @@ class ObsidFindFilter():
         Given a list element from the list of obsids extracted by this 
         class, extract the tstop and return it
         """
-        obs_tstop = observation[self.tstop]
-        return(obs_tstop)
+        return observation[self.tstop]
 
 
     #----------------------------------------------------------------------
@@ -937,10 +918,8 @@ class ObsidFindFilter():
         Given a list of obsids extracted by this class, loop through the 
         list and return a list of obsids.  The list contains ints
         """
-        si_mode_list = []
-        for each_observation in observation_list:
-            si_mode_list.append(each_observation[self.obsid])
-        return(si_mode_list)
+        return [each_observation[self.si_mode] 
+                for each_observation in observation_list]
 
     ######################################################################
     #
@@ -964,12 +943,7 @@ class ObsidFindFilter():
 
         Set the observation[self.in_focal_plane] value to the input 
         instrument
-        
         """
-        if(instrument == "ACIS-I") or \
-          (instrument == "ACIS-S") or \
-          (instrument == "HRC-I") or \
-          (instrument == "HRC-S"):
-
+        if instrument in ["ACIS-I", "ACIS-S", "HRC-I", "HRC-S"]:
             observation[self.in_focal_plane] = instrument
-        return()
+        return
