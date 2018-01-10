@@ -453,25 +453,32 @@ class ACISFPCheck(ACISThermalCheck):
 
         return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
 
-    def get_histogram_mask(self, msid, tlm, limit):
-        # Make quantiles. Use the histogram limits to decide 
-        # what temperature range will be included in the quantiles
-        # (we don't care about violations at low temperatures or 
-        # very high ones for this model)
-        # For FPTEMP, the only quantiles we want are those where 
-        # the temperature is -120.0 <= fptemp <= -112.0
-        if msid == self.msid:
-            ok = (tlm[msid] >= limit[0]) & (tlm[msid] <= limit[1]) # TA
-        else:
-            ok = np.ones(len(tlm[msid]), dtype=bool)
+    def get_histogram_mask(self, tlm, limit):
+        """
+        This method determines which values of telemetry
+        should be used to construct the temperature 
+        histogram plots, using limits provided by the 
+        calling program to mask the array via a logical
+        operation.
 
-        return ok
+        The implementation here in ACISFPCheck is to plot
+        values which fall between a lower and an upper
+        limit.
+
+        Parameters
+        ----------
+        tlm : NumPy record array
+            NumPy record array of telemetry
+        limit : array of floats
+            The limit or limits to use in the masking.
+        """
+        return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
 
     def make_check_plots(self, outdir, states, times, temps, tstart, 
                          perigee_passages, nopref_array):
         """
         Make output plots.
-    
+
         :param outdir: the directory to which the products are written
         :param states: commanded states
         :param times: time stamps (sec) for temperature arrays
