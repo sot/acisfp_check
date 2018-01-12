@@ -32,8 +32,7 @@ from acis_thermal_check import \
     ACISThermalCheck, \
     calc_off_nom_rolls, \
     get_options, \
-    make_state_builder, \
-    mylog
+    mylog, get_acis_limits
 from acis_thermal_check.utils import \
     plot_two, plot_one
 import os
@@ -1060,14 +1059,13 @@ def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
              "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
-    state_builder = make_state_builder(args.state_builder, args)
-    acisfp_check = ACISFPCheck("fptemp", "acisfp", MSID, YELLOW,
-                               MARGIN, VALIDATION_LIMITS, HIST_LIMIT, 
-                               calc_model, other_telem=['1dahtbon'],
-                               other_map={'1dahtbon': 'dh_heater', 
+    acisfp_check = ACISFPCheck("fptemp", "acisfp", MSID, VALIDATION_LIMITS, 
+                               HIST_LIMIT, calc_model, args,
+                               other_telem=['1dahtbon'],
+                               other_map={'1dahtbon': 'dh_heater',
                                           "fptemp_11": "fptemp"})
     try:
-        acisfp_check.driver(args, state_builder)
+        acisfp_check.driver()
     except Exception as msg:
         if args.traceback:
             raise
