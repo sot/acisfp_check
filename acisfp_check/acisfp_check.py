@@ -58,16 +58,18 @@ MSID = {"acisfp": "FPTEMP"}
 YELLOW = None
 MARGIN = None
 
+fp_sens, acis_i, acis_s = get_acis_limits("fptemp")
+
 # This is the cutoff temperature for any FPTEMP sensitive observation
 # if the FP temp goes above this number, and the obswervation is sensitive to
 # the focal plane temperature, it has to be flagged
-FP_TEMP_SENSITIVE = {"acisfp": -118.7}
+FP_TEMP_SENSITIVE = {"acisfp": fp_sens}
 
 # This is the new maximum temperature for all ACIS-S observations (4/26/16)
-ACIS_S_RED = {"acisfp": -112.0}
+ACIS_S_RED = {"acisfp": acis_s}
 
 # ACIS-I max temperatures remain at -114 deg. C
-ACIS_I_RED = {"acisfp": -114.0}
+ACIS_I_RED = {"acisfp": acis_i}
 
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
