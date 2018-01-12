@@ -53,24 +53,6 @@ default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 # INIT
 #
 MSID = {"acisfp": "FPTEMP"}
-# The next two limits don't apply to this model
-# so we set them to None
-YELLOW = None
-MARGIN = None
-
-fp_sens, acis_i, acis_s = get_acis_limits("fptemp")
-
-# This is the cutoff temperature for any FPTEMP sensitive observation
-# if the FP temp goes above this number, and the obswervation is sensitive to
-# the focal plane temperature, it has to be flagged
-FP_TEMP_SENSITIVE = {"acisfp": fp_sens}
-
-# This is the new maximum temperature for all ACIS-S observations (4/26/16)
-ACIS_S_RED = {"acisfp": acis_s}
-
-# ACIS-I max temperatures remain at -114 deg. C
-ACIS_I_RED = {"acisfp": acis_i}
-
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
                      }
@@ -430,19 +412,16 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        plan_limit = FP_TEMP_SENSITIVE[self.name]
-        cti_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, cti_only_obs, 
-                                            temp, times, load_start)
+        cti_viols = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
+                                            cti_only_obs, temp, times, load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
         #     These are not load killers
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
-        # Set the limit for those observations that are sensitive to the FP Temp
-        plan_limit = FP_TEMP_SENSITIVE[self.name]
 
-        fp_sens_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
+        fp_sens_viols = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
                                                 fp_sense_without_noprefs, temp, times,
                                                 load_start)
 
@@ -453,9 +432,7 @@ class ACISFPCheck(ACISThermalCheck):
         # 
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        # Set the limit 
-        plan_limit = ACIS_S_RED[self.name]
-        ACIS_S_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
+        ACIS_S_viols = search_obsids_for_viols(self.msid, self.name, self.acis_s_limit,
                                                ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
@@ -465,11 +442,8 @@ class ACISFPCheck(ACISThermalCheck):
         # 
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
-        # set the planning limit to the -114 C Red limit for ACIS-I observations
-        plan_limit = ACIS_I_RED[self.name]
-
         # Create the violation data structure.
-        ACIS_I_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
+        ACIS_I_viols = search_obsids_for_viols(self.msid, self.name, self.acis_i_limit,
                                                ACIS_I_obs, temp, times, load_start)
 
         return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
@@ -615,7 +589,7 @@ class ACISFPCheck(ACISThermalCheck):
                                         ylim=(-120, -90),
                                         ylim2=(40, 180),
                                         figsize=(12, 6))
-            plots[msid+"_1"]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
+            plots[msid+"_1"]['ax'].axhline(self.acis_i_limit, linestyle='--', color='red',
                                            linewidth=2.0)
             # Add a vertical line to mark the start time of the load
             plots[msid+"_1"]['ax'].axvline(load_start, linestyle='-', color='g',
@@ -746,13 +720,12 @@ class ACISFPCheck(ACISThermalCheck):
                         fontsize, plot_start)
     
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-            plots[msid+"_3"]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
+            plots[msid+"_3"]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-            plots[msid+"_3"]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='purple', linewidth=1.0)
+            plots[msid+"_3"]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=1.0)
             # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-            plots[msid+"_3"]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
-
-            # The next several lines ensure that the width of the axes                                                
+            plots[msid+"_3"]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=1.0)
+            # The next several lines ensure that the width of the axes
             # of all the weekly prediction plots are the same.                                                       
             w2, h2 = plots[msid+"_3"]['fig'].get_size_inches()
             lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
