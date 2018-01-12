@@ -53,8 +53,10 @@ default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 # INIT
 #
 MSID = {"acisfp": "FPTEMP"}
-YELLOW = {"acisfp": -50.0}
-MARGIN = {"acisfp": 2.5}
+# The next two limits don't apply to this model
+# so we set them to None
+YELLOW = None
+MARGIN = None
 
 # This is the cutoff temperature for any FPTEMP sensitive observation
 # if the FP temp goes above this number, and the obswervation is sensitive to
