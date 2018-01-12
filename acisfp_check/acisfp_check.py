@@ -149,22 +149,6 @@ class ACISFPCheck(ACISThermalCheck):
                                           other_telem=other_telem, other_map=other_map)
         self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = get_acis_limits("fptemp")
 
-    def calc_model_wrapper(self, model_spec, states, tstart, tstop, state0=None):
-        if state0 is None:
-            start_msid = None
-            dh_heater = None
-            dh_heater_times = None
-        else:
-            start_msid = state0[self.msid]
-            htrbfn = os.path.join(self.bsdir, 'dahtbon_history.rdb')
-            mylog.info('Reading file of dahtrb commands from file %s' % htrbfn)
-            htrb = ascii.read(htrbfn, format='rdb')
-            dh_heater_times = date2secs(htrb['time'])
-            dh_heater = htrb['dahtbon'].astype(bool)
-        return self.calc_model(model_spec, states, tstart, tstop, T_acisfp=start_msid,
-                               T_acisfp_times=None, dh_heater=dh_heater, 
-                               dh_heater_times=dh_heater_times)
-
     def make_week_predict(self, tstart, tstop, tlm, T_init, model_spec,
                           outdir):
 
