@@ -60,7 +60,6 @@ MARGIN = {"acisfp": 2.5}
 # if the FP temp goes above this number, and the obswervation is sensitive to
 # the focal plane temperature, it has to be flagged
 FP_TEMP_SENSITIVE = {"acisfp": -118.7}
-FP_TEMP_MINIMUM = {"acisfp": -118.7}
 
 # This is the new maximum temperature for all ACIS-S observations (4/26/16)
 ACIS_S_RED = {"acisfp": -112.0}
