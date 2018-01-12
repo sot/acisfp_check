@@ -160,6 +160,14 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
 
 class ACISFPCheck(ACISThermalCheck):
 
+    def __init__(self, msid, name, MSIDs, validation_limits,
+                 hist_limit, calc_model, args, other_telem=None,
+                 other_map=None):
+        super(ACISFPCheck, self).__init__(msid, name, MSIDs, validation_limits,
+                                          hist_limit, calc_model, args, 
+                                          other_telem=other_telem, other_map=other_map)
+        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = get_acis_limits("fptemp")
+
     def calc_model_wrapper(self, model_spec, states, tstart, tstop, state0=None):
         if state0 is None:
             start_msid = None
