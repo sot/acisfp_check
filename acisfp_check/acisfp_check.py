@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 import glob
 import re
-from Ska.Matplotlib import pointpair
-import Ska.Numpy
+from Ska.Matplotlib import pointpair, \
+    cxctime2plotdate
 import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime, date2secs
 from astropy.io import ascii
@@ -33,7 +33,7 @@ from acis_thermal_check import \
     calc_off_nom_rolls, \
     get_options, \
     make_state_builder, \
-    get_acis_limits, mylog
+    mylog
 from acis_thermal_check.utils import \
     plot_two
 import os
@@ -885,14 +885,14 @@ def paint_perigee(perigee_passages, states, plots, msid):
         # on the plot. otherwise ignore
         if states['tstop'][-1] >= DateTime(eachpassage[1]).secs >= states['tstart'][0]:
             # Have to convert this time into the new x axis time scale necessitated by SKA
-            xpos = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[1]).secs])
+            xpos = cxctime2plotdate([DateTime(eachpassage[1]).secs])
 
             # now plot the line.
             plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
 
             # Plot the perigee passage time so long as it was specified in the CTI_report file
             if eachpassage[3] != "Not-within-load":
-                perigee_time = Ska.Matplotlib.cxctime2plotdate([DateTime(eachpassage[3]).secs])
+                perigee_time = cxctime2plotdate([DateTime(eachpassage[3]).secs])
                 plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', 
                                          color='black', linewidth=2.0)
 
@@ -959,8 +959,8 @@ def draw_obsids(extract_and_filter,
                 obsid = obsid + ' * FP SENS *'
 
         # Convert the start and stop times into the Ska-required format
-        obs_start = Ska.Matplotlib.cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
-        obs_stop = Ska.Matplotlib.cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
+        obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
+        obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
         if eachobservation[extract_and_filter.in_focal_plane].startswith("ACIS-"):
             # For each ACIS Obsid, draw a horizontal line to show 
