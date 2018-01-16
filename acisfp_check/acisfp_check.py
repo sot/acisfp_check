@@ -257,8 +257,8 @@ class ACISFPCheck(ACISThermalCheck):
                                                                  tstart, perigee_passages, 
                                                                  nopref_array)
 
-        viols = self.make_prediction_viols(states, model.times, temps, obs_with_sensitivity, 
-                                           nopref_array)
+        viols = self.make_prediction_viols(states, model.times, temps, tstart, 
+                                           obs_with_sensitivity, nopref_array)
 
         # write_states writes the commanded states to states.dat
         self.write_states(outdir, states)
@@ -345,7 +345,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         return
 
-    def make_prediction_viols(self, states, times, temps, 
+    def make_prediction_viols(self, states, times, temps, load_start,
                               obs_with_sensitivity, nopref_array):
         """
         Find limit violations where predicted temperature is above the
@@ -422,7 +422,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         plan_limit = FP_TEMP_SENSITIVE[self.name]
         cti_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, cti_only_obs, 
-                                            temp, times)
+                                            temp, times, load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -433,7 +433,8 @@ class ACISFPCheck(ACISThermalCheck):
         plan_limit = FP_TEMP_SENSITIVE[self.name]
 
         fp_sens_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
-                                                fp_sense_without_noprefs, temp, times)
+                                                fp_sense_without_noprefs, temp, times,
+                                                load_start)
 
         # --------------------------------------------------------------
         #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run. 
@@ -459,7 +460,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         # Create the violation data structure.
         ACIS_I_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
-                                               ACIS_I_obs, temp, times)
+                                               ACIS_I_obs, temp, times, load_start)
 
         return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
 
@@ -795,7 +796,8 @@ class ACISFPCheck(ACISThermalCheck):
         return plots, obs_with_sensitivity
 
 
-def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times):
+def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times,
+                            load_start):
     """
     Given a planning limit and a list of observations, find those time intervals
     where the temp gets warmer than the planning limit and identify which 
@@ -809,7 +811,7 @@ def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times):
 
     bad = np.concatenate([[False], temp >= plan_limit, [False]])
 
-    # changes is a list of lists. Each sublist is a 2-ple which
+    # changes is a list of lists. Each sublist is a tuple which
     # contains indices into the times list. 0 = start times
     # and 1 = stop time
     changes = np.flatnonzero(bad[1:] != bad[:-1]).reshape(-1, 2)
@@ -818,6 +820,14 @@ def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times):
     for change in changes:
         tstart = times[change[0]]
         tstop = times[change[1] - 1]
+
+        # Only report violations which occur after the load being
+        # reviewed starts.
+        in_load = tstart > load_start or \
+                  (tstart < load_start < tstop)
+
+        if not in_load:
+            continue
 
         # find the observations that contains all or part of this time interval
         #  add this to the violations list "viols[msid]"
