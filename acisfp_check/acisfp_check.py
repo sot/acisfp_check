@@ -564,8 +564,10 @@ class ACISFPCheck(ACISThermalCheck):
         plots = {}
     
         # Start time of loads being reviewed expressed in units for plotdate()
-        load_start = Ska.Matplotlib.cxctime2plotdate([tstart])[0]
-    
+        load_start = cxctime2plotdate([tstart])[0]
+        # Value for left side of plots
+        plot_start = max(load_start-2.0*86400.0, cxctime2plotdate([times[0]])[0])
+
         #
         # Make  plots of FPTEMP and pitch vs time 
         #
@@ -618,7 +620,7 @@ class ACISFPCheck(ACISThermalCheck):
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
                         plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, fontsize)
             # Set the left limit of the plot to be -2 days before the load start
-            plots[msid+"_1"]['ax'].set_xlim(load_start-2.0*86400.0, None)
+            plots[msid+"_1"]['ax'].set_xlim(plot_start, None)
             # Build the file name and output the plot to a file
             filename = MSID[msid].lower() + 'M120toM90.png'
             outfile = os.path.join(outdir, filename)
@@ -670,7 +672,7 @@ class ACISFPCheck(ACISThermalCheck):
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
                         plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, fontsize)
             # Set the left limit of the plot to be -2 days before the load start
-            plots[msid+"_2"]['ax'].set_xlim(load_start-2.0*86400.0, None)
+            plots[msid+"_2"]['ax'].set_xlim(plot_start, None)
             # Build the file name and output the file
             filename = MSID[msid].lower() + 'M120toM119.png'
             outfile = os.path.join(outdir, filename)
@@ -730,7 +732,7 @@ class ACISFPCheck(ACISThermalCheck):
             # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
             plots[msid+"_3"]['ax'].axhline(ACIS_S_RED[msid], linestyle='--', color='blue', linewidth=1.0)
             # Set the left limit of the plot to be -2 days before the load start
-            plots[msid+"_3"]['ax'].set_xlim(load_start-2.0*86400.0, None)
+            plots[msid+"_3"]['ax'].set_xlim(plot_start, None)
 
             # The next several lines ensure that the width of the axes                                                
             # of all the weekly prediction plots are the same.                                                       
@@ -766,7 +768,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots['pow_sim']['ax'].axvline(load_start, linestyle='-', color='g',
                                        linewidth=2.0)
         # Set the left limit of the plot to be -2 days before the load start
-        plots['pow_sim']['ax'].set_xlim(load_start-2.0*86400.0, None)
+        plots['pow_sim']['ax'].set_xlim(plot_start, None)
         # The next several lines ensure that the width of the axes                                              
         # of all the weekly prediction plots are the same.                                                   
         w2, h2 = plots["pow_sim"]['fig'].get_size_inches()
