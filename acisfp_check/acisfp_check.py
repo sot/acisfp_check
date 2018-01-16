@@ -243,13 +243,13 @@ class ACISFPCheck(ACISThermalCheck):
 
         # obs_with_sensitivity contains all ACIS and all CTI observations 
         # and has had the sensitivity boolean added.
-        plots, obs_with_sensitivity = self.make_check_plots(outdir, states, 
-                                                            model.times, temps, 
-                                                            tstart, perigee_passages, 
-                                                            nopref_array)
+        plots, obs_with_sensitivity = self.make_prediction_plots(outdir, states, 
+                                                                 model.times, temps, 
+                                                                 tstart, perigee_passages, 
+                                                                 nopref_array)
 
-        viols = self.make_viols(states, model.times, temps, obs_with_sensitivity, 
-                                nopref_array)
+        viols = self.make_prediction_viols(states, model.times, temps, obs_with_sensitivity, 
+                                           nopref_array)
 
         # write_states writes the commanded states to states.dat
         self.write_states(outdir, states)
@@ -336,7 +336,8 @@ class ACISFPCheck(ACISThermalCheck):
 
         return
 
-    def make_viols(self, states, times, temps, obs_with_sensitivity, nopref_array):
+    def make_prediction_viols(self, states, times, temps, 
+                              obs_with_sensitivity, nopref_array):
         """
         Find limit violations where predicted temperature is above the
         red minus margin.
@@ -474,8 +475,8 @@ class ACISFPCheck(ACISThermalCheck):
         """
         return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
 
-    def make_check_plots(self, outdir, states, times, temps, tstart, 
-                         perigee_passages, nopref_array):
+    def make_prediction_plots(self, outdir, states, times, temps, tstart, 
+                              perigee_passages, nopref_array):
         """
         Make output plots.
 
@@ -550,7 +551,7 @@ class ACISFPCheck(ACISThermalCheck):
             obsid = str(extract_and_filter.get_obsid(eachobservation))
             # See if it's in the sensitive list. If so, indicate whether or
             # not this observation is FP Senstive in the new list. This will be
-            # used later in make_viols to catch violations.
+            # used later in make_prediction_viols to catch violations.
             if obsid in list_of_sensitive_obs:
                 eachobservation.append(True)
             else:
