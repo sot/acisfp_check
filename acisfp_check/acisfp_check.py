@@ -38,6 +38,8 @@ from acis_thermal_check.utils import \
     plot_two
 import os
 import sys
+from kadi import events
+
 #
 # Import ACIS-specific observation extraction, filtering 
 # and attribute support routines.
@@ -234,6 +236,13 @@ class ACISFPCheck(ACISThermalCheck):
         # model-specific code.
         model = self.calc_model_wrapper(model_spec, states, state0['tstart'],
                                         tstop, state0=state0)
+
+        # Now that we have run the model, we gather the perigee passages
+        # that occur from the beginning of the model run up to the start
+        # of the load from kadi
+        rzs = events.rad_zones.filter(state0['tstart'], tstart)
+        perigee_passages = [[rz.start, rz.perigee, rz.stop] for rz in rzs] + \
+                           perigee_passages
 
         # Make the limit check plots and data files
         plt.rc("axes", labelsize=10, titlesize=12)
