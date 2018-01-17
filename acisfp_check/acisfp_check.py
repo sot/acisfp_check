@@ -215,9 +215,7 @@ class ACISFPCheck(ACISThermalCheck):
             # split the CRM Pad Time file line read in and extract the
             # relevant information
             splitline = aline.split()
-            passage.append(splitline[0])  # Event Type (EEF or XEF)
-            passage.append(splitline[6])  # CTI Start time
-            passage.append(splitline[7])  # CTI Stop time
+            passage.append(splitline[6])  # Radzone entry/exit
             passage.append(splitline[9])  # Perigee Passage time
 
             # append this passage to the passages list
@@ -241,7 +239,8 @@ class ACISFPCheck(ACISThermalCheck):
         # that occur from the beginning of the model run up to the start
         # of the load from kadi
         rzs = events.rad_zones.filter(state0['tstart'], tstart)
-        perigee_passages = [[rz.start, rz.perigee, rz.stop] for rz in rzs] + \
+        perigee_passages = [[rz.start, rz.perigee] for rz in rzs] + \
+                           [[rz.stop, rz.perigee] for rz in rzs] + \
                            perigee_passages
 
         # Make the limit check plots and data files
@@ -885,9 +884,7 @@ def paint_perigee(perigee_passages, states, plots, msid):
     events in the load.EEF and XEF lines are black; Perigee is red.
 
     You supply the list of perigee passage events which are:
-        Event Type (EEF or XEF)
-        CTI Start time
-        CTI Stop time
+        Radzone Start/Stop time
         Perigee Passage time
 
         The states you created in main
@@ -902,16 +899,16 @@ def paint_perigee(perigee_passages, states, plots, msid):
         # The index [1] item is always the Perigee Passage time. Draw that line in red
         # If this line is between tstart and tstop then it needs to be drawn 
         # on the plot. otherwise ignore
-        if states['tstop'][-1] >= DateTime(eachpassage[1]).secs >= states['tstart'][0]:
+        if states['tstop'][-1] >= DateTime(eachpassage[0]).secs >= states['tstart'][0]:
             # Have to convert this time into the new x axis time scale necessitated by SKA
-            xpos = cxctime2plotdate([DateTime(eachpassage[1]).secs])
+            xpos = cxctime2plotdate([DateTime(eachpassage[0]).secs])
 
             # now plot the line.
             plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
 
             # Plot the perigee passage time so long as it was specified in the CTI_report file
-            if eachpassage[3] != "Not-within-load":
-                perigee_time = cxctime2plotdate([DateTime(eachpassage[3]).secs])
+            if eachpassage[1] != "Not-within-load":
+                perigee_time = cxctime2plotdate([DateTime(eachpassage[1]).secs])
                 plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', 
                                          color='black', linewidth=2.0)
 
