@@ -35,7 +35,7 @@ from acis_thermal_check import \
     make_state_builder, \
     mylog
 from acis_thermal_check.utils import \
-    plot_two
+    plot_two, plot_one
 import os
 import sys
 from kadi import events
@@ -757,9 +757,9 @@ class ACISFPCheck(ACISThermalCheck):
             mylog.info('   Writing plot file %s' % outfile)
             plots[msid+"_3"]['fig'].savefig(outfile)
             plots[msid+"_3"]['filename'] = filename
-    
+
         # end of for fig_id, msid in enumerate(('fptemp',)):
-    
+
         # Now create the plot of ACIS CCD number and Sim-Z position
         plots['pow_sim'] = plot_two(
             fig_id=fig_id + 1,
@@ -779,8 +779,8 @@ class ACISFPCheck(ACISThermalCheck):
                                        linewidth=2.0)
         # Set the left limit of the plot to be -2 days before the load start
         plots['pow_sim']['ax'].set_xlim(plot_start, None)
-        # The next several lines ensure that the width of the axes                                              
-        # of all the weekly prediction plots are the same.                                                   
+        # The next several lines ensure that the width of the axes
+        # of all the weekly prediction plots are the same.
         w2, h2 = plots["pow_sim"]['fig'].get_size_inches()
         lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
         rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
@@ -791,6 +791,32 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('   Writing plot file %s' % outfile)
         plots['pow_sim']['fig'].savefig(outfile)
         plots['pow_sim']['filename'] = filename
+
+        # Make a plot of off-nominal roll
+        plots['roll'] = plot_one(
+            fig_id=fig_id+1,
+            title='Off-Nominal Roll (deg)',
+            xlabel='Date',
+            x=pointpair(states['tstart'], states['tstop']),
+            y=pointpair(calc_off_nom_rolls(states)),
+            ylabel='Roll Angle (deg)',
+            ylim=(-20.0, 20.0))
+        # Add a vertical line to mark the start time of the load
+        plots['roll']['ax'].axvline(load_start, linestyle='-', color='g',
+                                    linewidth=2.0)
+        # Set the left limit of the plot to be -2 days before the load start
+        plots['roll']['ax'].set_xlim(plot_start, None)
+        # The next several lines ensure that the width of the axes
+        # of all the weekly prediction plots are the same.
+        w2, h2 = plots['roll']['fig'].get_size_inches()
+        lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
+        rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
+        plots['roll']['fig'].subplots_adjust(left=lm, right=rm)
+        filename = 'roll.png'
+        outfile = os.path.join(outdir, filename)
+        mylog.info('Writing plot file %s' % outfile)
+        plots['roll']['fig'].savefig(outfile)
+        plots['roll']['filename'] = filename
 
         return plots, obs_with_sensitivity
 
