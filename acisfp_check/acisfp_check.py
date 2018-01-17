@@ -445,7 +445,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Set the limit 
         plan_limit = ACIS_S_RED[self.name]
         ACIS_S_viols = search_obsids_for_viols(self.msid, self.name, plan_limit, 
-                                               ACIS_S_obs, temp, times)
+                                               ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
         #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run. 
