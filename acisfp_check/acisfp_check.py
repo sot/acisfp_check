@@ -628,7 +628,8 @@ class ACISFPCheck(ACISThermalCheck):
             textypos = -108.0
             fontsize = 12
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, 
+                        fontsize, plot_start)
             # Set the left limit of the plot to be -2 days before the load start
             plots[msid+"_1"]['ax'].set_xlim(plot_start, None)
             # Build the file name and output the plot to a file
@@ -680,7 +681,8 @@ class ACISFPCheck(ACISThermalCheck):
             textypos = ypos + 0.05
             fontsize = 9
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, 
+                        fontsize, plot_start)
             # Set the left limit of the plot to be -2 days before the load start
             plots[msid+"_2"]['ax'].set_xlim(plot_start, None)
             # Build the file name and output the file
@@ -733,7 +735,8 @@ class ACISFPCheck(ACISThermalCheck):
             fontsize = 9
     
             draw_obsids(extract_and_filter, obs_with_sensitivity, nopref_array,
-                        plots, msid+"_3", ypos, endcapstart, endcapstop, textypos, fontsize)
+                        plots, msid+"_3", ypos, endcapstart, endcapstop, textypos, 
+                        fontsize, plot_start)
     
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
             plots[msid+"_3"]['ax'].axhline(FP_TEMP_SENSITIVE[msid], linestyle='--', color='red', linewidth=2.0)
@@ -947,7 +950,8 @@ def draw_obsids(extract_and_filter,
                 endcapstart, 
                 endcapstop, 
                 textypos, 
-                fontsize):
+                fontsize,
+                plot_start):
     """
     This functiion draws visual indicators across the top of the plot showing
     which observations are ACIS; whether they are ACIS-I (red) or ACIS-S (green)
@@ -969,6 +973,7 @@ def draw_obsids(extract_and_filter,
                The Y position of the top of the end caps
                The starting position of the OBSID number text
                The font size
+               The left time of the plot in plot_date units
     """
     # Now run through the observation list attribute of the ObsidFindFilter class
     for eachobservation in obs_with_sensitivity:
@@ -1029,15 +1034,17 @@ def draw_obsids(extract_and_filter,
             # Now print the obsid in the middle of the time span, 
             # above the line, and rotate 90 degrees. 
 
-            # Now plot the obsid.
-            plots[msid]['ax'].text(obs_start + ((obs_stop - obs_start)/2), 
-                                   textypos, 
-                                   obsid,  
-                                   color = color, 
-                                   va='bottom', 
-                                   ma='left', 
-                                   rotation = 90, 
-                                   fontsize = fontsize )
+            obs_time = obs_start + (obs_stop - obs_start)/2
+            if obs_time > plot_start:
+                # Now plot the obsid.
+                plots[msid]['ax'].text(obs_time, 
+                                       textypos, 
+                                       obsid,  
+                                       color = color, 
+                                       va='bottom', 
+                                       ma='left', 
+                                       rotation = 90, 
+                                       fontsize = fontsize)
 
 
 #------------------------------------------------------------------------------
