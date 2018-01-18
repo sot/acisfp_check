@@ -602,7 +602,7 @@ class ACISFPCheck(ACISThermalCheck):
                                         ylabel2='Pitch (deg)',
                                         ylim=(-120, -90),
                                         ylim2=(40, 180),
-                                        figsize=(14, 7),
+                                        figsize=(10, 5),
                                         )
             plots[msid+"_1"]['ax'].axhline(ACIS_I_RED[msid], linestyle='--', color='red',
                                            linewidth=2.0)
@@ -656,7 +656,7 @@ class ACISFPCheck(ACISThermalCheck):
                                         ylabel2='Pitch (deg)',
                                         ylim=(-120, -119),
                                         ylim2=(40, 180),
-                                        figsize=(14, 7),
+                                        figsize=(10, 5),
                                         )
             # Add a vertical line to mark the start time of the load
             plots[msid+"_2"]['ax'].axvline(load_start, linestyle='-', color='g',
@@ -709,7 +709,7 @@ class ACISFPCheck(ACISThermalCheck):
                                         ylabel2='Pitch (deg)',
                                         ylim=(-120, -111.5),
                                         ylim2=(40, 180),
-                                        figsize=(14, 7),
+                                        figsize=(10, 5),
                                         )
             # Add a vertical line to mark the start time of the load
             plots[msid+"_3"]['ax'].axvline(load_start, linestyle='-', color='g',
@@ -776,7 +776,7 @@ class ACISFPCheck(ACISThermalCheck):
             y2=pointpair(states['simpos']),
             ylabel2='SIM-Z (steps)',
             ylim2=(-105000, 105000),
-        )
+            figsize=(10, 5))
         # Add a vertical line to mark the start time of the load
         plots['pow_sim']['ax'].axvline(load_start, linestyle='-', color='g',
                                        linewidth=2.0)
@@ -803,7 +803,8 @@ class ACISFPCheck(ACISThermalCheck):
             x=pointpair(states['tstart'], states['tstop']),
             y=pointpair(calc_off_nom_rolls(states)),
             ylabel='Roll Angle (deg)',
-            ylim=(-20.0, 20.0))
+            ylim=(-20.0, 20.0), 
+            figsize=(10, 5))
         # Add a vertical line to mark the start time of the load
         plots['roll']['ax'].axvline(load_start, linestyle='-', color='g',
                                     linewidth=2.0)
@@ -879,7 +880,7 @@ def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times,
                obs_tstop >= tstop >= obs_tstart or \
                (tstart <= obs_tstart and tstop >= obs_tstop):
                 # Fetch the obsid for this observation and append to list
-                obsid_list = obsid_list + ' '+ str(eandf.get_obsid(eachobs))
+                obsid_list = obsid_list + ' ' + str(eandf.get_obsid(eachobs))
 
         # If obsid_list is not empty, then create the violation
         if obsid_list != '':
