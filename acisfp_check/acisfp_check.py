@@ -941,7 +941,7 @@ def main():
                                other_map={'1dahtbon': 'dh_heater',
                                           "fptemp_11": "fptemp"})
     try:
-        acisfp_check.driver()
+        acisfp_check.run()
     except Exception as msg:
         if args.traceback:
             raise
