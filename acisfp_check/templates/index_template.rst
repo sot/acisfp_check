@@ -16,7 +16,7 @@ Summary
 ====================  =============================================
 Date start            {{proc.datestart}}
 Date stop             {{proc.datestop}}
-FP_TEMP status        {%if ACIS_I_viols.fptemp or ACIS_S_viols.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
+FP_TEMP status        {%if viols.ACIS_I.fptemp or viols.ACIS_S.fptemp %}:red:`NOT OK`{% else %}OK{% endif%} 
 {% if bsdir %}
 Load directory        {{bsdir}}
 {% endif %}
@@ -32,7 +32,7 @@ ACIS-I FP_TEMP -114 deg C Violations
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     Obsids
 =====================  =====================  ==================  ==================
-{% for viol in ACIS_I_viols.fptemp %}
+{% for viol in viols.ACIS_I.fptemp %}
 {{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}            {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
@@ -47,7 +47,7 @@ ACIS-S FP_TEMP -112 deg C Violations
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     Obsids
 =====================  =====================  ==================  ==================
-{% for viol in ACIS_S_viols.fptemp %}
+{% for viol in viols.ACIS_S.fptemp %}
 {{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}            {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
@@ -56,13 +56,13 @@ No ACIS-S -112 deg C FP_TEMP Violations
 {% endif %}
 
 
-{% if fp_sens_viols.fptemp %}
+{% if viols.fp_sens.fptemp %}
 FP TEMP Sensitive, -118.7 deg. C Preference Not Met:
 -------------------------------------------------------------------
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     OBSID
 =====================  =====================  ==================  ==================
-{% for viol in fp_sens_viols.fptemp %}
+{% for viol in viols.fp_sens.fptemp %}
 {{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}             {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
@@ -72,13 +72,13 @@ No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Preferences Unmet
 
 
 
-{% if cti_viols.fptemp %}
+{% if viols.cti.fptemp %}
 FP_TEMP -118.7 deg C Violations for Perigee Passages
 -------------------------------------------------------------------
 =====================  =====================  ==================
 Date start             Date stop              Max temperature
 =====================  =====================  ==================
-{% for viol in cti_viols.fptemp %}
+{% for viol in viols.cti.fptemp %}
 {{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}
 {% endfor %}
 =====================  =====================  ==================

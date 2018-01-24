@@ -19,7 +19,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 import glob
-import re
 from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
 import Ska.engarchive.fetch_sci as fetch
@@ -147,10 +146,25 @@ class ACISFPCheck(ACISThermalCheck):
         self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = get_acis_limits("fptemp")
         # Read in the FP Sensitive Nopref file and form nopref array from it.
         self.nopref_array = process_nopref_list(self.args.fps_nopref)
+        # Create an empty observation list which will hold the results. This
+        # list contains all ACIS and all CTI observations and will have the 
+        # sensitivity boolean added.
+        self.obs_with_sensitivity = []
 
-    def _gather_perigee(self, tstart, state0):
+    def _gather_perigee(self, run_start, load_start):
         # The first step is to build a list of all the perigee passages.
-        # We will get those from the relevant CRM pad time file
+        perigee_passages = []
+
+        # Gather the perigee passages that occur from the
+        # beginning of the model run up to the start of the load
+        # from kadi
+        rzs = events.rad_zones.filter(run_start, load_start)
+        for rz in rzs:
+            perigee_passages.append([rz.start, rz.perigee])
+        for rz in rzs:
+            perigee_passages.append([rz.stop, rz.perigee])
+
+        # We will get the load passages from the relevant CRM pad time file
         # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
         # Each line is either an inbound  or outbound CTI
         #
@@ -174,9 +188,6 @@ class ACISFPCheck(ACISThermalCheck):
             raise RuntimeError("Couldn't find the end of the CRM Pad Time file header!")
 
         # Found the last line of the header. Start processing Perigee Passages
-        # initialize the resultant Perigee Passage list to empty
-        # This is the product of this section of code.
-        perigee_passages = []
 
         # While there are still lines to be read
         for aline in alines[idx:]:
@@ -195,76 +206,9 @@ class ACISFPCheck(ACISThermalCheck):
         # Done with the CRM Pad Time file - close it
         crm_file.close()
 
-        # Now we gather the perigee passages that occur from the
-        # beginning of the model run up to the start of the load
-        # from kadi
-        rzs = events.rad_zones.filter(state0['tstart'], tstart)
-        perigee_passages = [[rz.start, rz.perigee] for rz in rzs] + \
-                           [[rz.stop, rz.perigee] for rz in rzs] + \
-                           perigee_passages
-
         return perigee_passages
 
-    def make_week_predict(self, tstart, tstop, tlm, T_init, model_spec,
-                          outdir):
-        """
-        Parameters
-        ----------
-        tstart : float
-            The start time of the model run in seconds from the beginning
-            of the mission.
-        tstop : float
-            The stop time of the model run in seconds from the beginning
-            of the mission.
-        tlm : NumPy structured array
-            Telemetry which will be used to construct the initial temperature
-        T_init : float
-            The initial temperature of the model prediction. If None, an
-            initial value will be constructed from telemetry.
-        model_spec : string
-            The path to the thermal model specification.
-        outdir : string
-            The directory to write outputs to.
-        """
-        mylog.info('Calculating %s thermal model' % self.name.upper())
-
-        # Get commanded states and set initial temperature
-        states, state0 = self.get_states(tlm, T_init)
-
-        # Determine perigee passages
-        perigee_passages = self._gather_perigee(tstart, state0)
-
-        # calc_model_wrapper actually does the model calculation by running
-        # model-specific code.
-        model = self.calc_model_wrapper(model_spec, states, state0['tstart'],
-                                        tstop, state0=state0)
-
-        # Make the limit check plots and data files
-        plt.rc("axes", labelsize=10, titlesize=12)
-        plt.rc("xtick", labelsize=10)
-        plt.rc("ytick", labelsize=10)
-        temps = {self.name: model.comp[self.msid].mvals}
-
-        # obs_with_sensitivity contains all ACIS and all CTI observations 
-        # and has had the sensitivity boolean added.
-        plots, obs_with_sensitivity = self.make_prediction_plots(outdir, states, 
-                                                                 model.times, temps, 
-                                                                 tstart, perigee_passages)
-
-        viols = self.make_prediction_viols(states, model.times, temps, tstart, 
-                                           obs_with_sensitivity)
-
-        # write_states writes the commanded states to states.dat
-        self.write_states(outdir, states)
-        # write_temps writes the temperatures to temperatures.dat
-        self.write_temps(outdir, model.times, temps)
-
-        return dict(states=states, times=model.times, temps=temps,
-                    plots=plots, ACIS_I_viols=viols[0], ACIS_S_viols=viols[1],
-                    cti_viols=viols[2], fp_sens_viols=viols[3])
-
-    def make_prediction_plots(self, outdir, states, times, temps, tstart, 
-                              perigee_passages):
+    def make_prediction_plots(self, outdir, states, times, temps, tstart):
         """
         Make output plots.
 
@@ -279,6 +223,9 @@ class ACISFPCheck(ACISThermalCheck):
         is populated with
         """
     
+        # Gather perigee passages
+        perigee_passages = self._gather_perigee(times[0], tstart)
+
         # Next we need to find all the ACIS-S observations within the start/stop
         # times so that we can paint those on the plots as well. We will get
         # those from the commanded states data structure called "states" 
@@ -326,11 +273,6 @@ class ACISFPCheck(ACISThermalCheck):
         # Now that you have the latest list of temperature sensitive OBSID's, 
         # run through each observation and append either "*FP SENS*" or
         # "NOT FP SENS" to the end of each observation. 
-        #
-        # Create an empty observation list which will hold the results. This
-        # list contains all ACIS and all CTI observations and will have the 
-        # sensitivity boolean added.
-        obs_with_sensitivity = []
     
         # Now run through the observation list attribute of the ObsidFindFilter class
         for eachobservation in acis_and_cti_obs:
@@ -345,7 +287,7 @@ class ACISFPCheck(ACISThermalCheck):
             else:
                 eachobservation.append(False)
     
-            obs_with_sensitivity.append(eachobservation)
+            self.obs_with_sensitivity.append(eachobservation)
     
         #
         # create an empty dictionary called plots to contain the returned 
@@ -406,7 +348,7 @@ class ACISFPCheck(ACISThermalCheck):
             endcapstop = -109.0
             textypos = -108.0
             fontsize = 12
-            draw_obsids(extract_and_filter, obs_with_sensitivity, self.nopref_array,
+            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
                         plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, 
                         fontsize, plot_start)
             # Build the file name and output the plot to a file
@@ -457,7 +399,7 @@ class ACISFPCheck(ACISThermalCheck):
             endcapstop = ypos - 0.05
             textypos = ypos + 0.05
             fontsize = 9
-            draw_obsids(extract_and_filter, obs_with_sensitivity, self.nopref_array,
+            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
                         plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, 
                         fontsize, plot_start)
             # Build the file name and output the file
@@ -509,7 +451,7 @@ class ACISFPCheck(ACISThermalCheck):
             textypos = -115.7
             fontsize = 9
     
-            draw_obsids(extract_and_filter, obs_with_sensitivity, self.nopref_array,
+            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
                         plots, msid+"_3", ypos, endcapstart, endcapstop, textypos, 
                         fontsize, plot_start)
     
@@ -592,10 +534,9 @@ class ACISFPCheck(ACISThermalCheck):
         plots['roll']['fig'].savefig(outfile)
         plots['roll']['filename'] = filename
 
-        return plots, obs_with_sensitivity
+        return plots
 
-    def make_prediction_viols(self, states, times, temps, load_start,
-                              obs_with_sensitivity):
+    def make_prediction_viols(self, times, temps, load_start):
         """
         Find limit violations where predicted temperature is above the
         red minus margin.
@@ -628,9 +569,10 @@ class ACISFPCheck(ACISThermalCheck):
 
         """
         mylog.info('\nMAKE VIOLS Checking for limit violations in ' +
-                   str(len(states)) + ' states and\n ' +
-                   str(len(obs_with_sensitivity)) +
+                   str(len(self.obs_with_sensitivity)) +
                    " total science observations")
+
+        viols = {}
 
         # create an instance of ObsidFindFilter()
         eandf = ObsidFindFilter()
@@ -639,13 +581,13 @@ class ACISFPCheck(ACISThermalCheck):
         #   Create subsets of all the observations
         # ------------------------------------------------------
         # Just the CTI runs
-        cti_only_obs = eandf.cti_only_filter(obs_with_sensitivity)
+        cti_only_obs = eandf.cti_only_filter(self.obs_with_sensitivity)
         # Now divide out observations by ACIS-S and ACIS-I
-        ACIS_S_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-S")
-        ACIS_I_obs = eandf.get_all_specific_instrument(obs_with_sensitivity, "ACIS-I")
+        ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
+        ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
 
         # ACIS SCIENCE observations only  - no HRC; no CTI
-        non_cti_obs = eandf.cti_filter(obs_with_sensitivity)
+        non_cti_obs = eandf.cti_filter(self.obs_with_sensitivity)
 
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
         fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
@@ -669,8 +611,8 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        cti_viols = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
-                                            cti_only_obs, temp, times, load_start)
+        viols["cti"] = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
+                                               cti_only_obs, temp, times, load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -678,9 +620,9 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
-        fp_sens_viols = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
-                                                fp_sense_without_noprefs, temp, times,
-                                                load_start)
+        viols["fp_sens"] = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
+                                                   fp_sense_without_noprefs, temp, times,
+                                                   load_start)
 
         # --------------------------------------------------------------
         #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
@@ -689,8 +631,8 @@ class ACISFPCheck(ACISThermalCheck):
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        ACIS_S_viols = search_obsids_for_viols(self.msid, self.name, self.acis_s_limit,
-                                               ACIS_S_obs, temp, times, load_start)
+        viols["ACIS_S"] = search_obsids_for_viols(self.msid, self.name, self.acis_s_limit,
+                                                  ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
         #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run.
@@ -700,10 +642,10 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        ACIS_I_viols = search_obsids_for_viols(self.msid, self.name, self.acis_i_limit,
-                                               ACIS_I_obs, temp, times, load_start)
+        viols["ACIS_I"] = search_obsids_for_viols(self.msid, self.name, self.acis_i_limit,
+                                                  ACIS_I_obs, temp, times, load_start)
 
-        return ACIS_I_viols, ACIS_S_viols, cti_viols, fp_sens_viols
+        return viols
 
     def get_histogram_mask(self, tlm, limit):
         """
