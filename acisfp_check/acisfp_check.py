@@ -57,9 +57,6 @@ VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
 
 HIST_LIMIT = [(-120.0, -112.0)]
 
-URL = "file:///home/gregg/git/xija/models/acisfp"
-
-
 def calc_model(model_spec, states, start, stop, T_acisfp=None,
                T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
     """
@@ -200,7 +197,7 @@ class ACISFPCheck(ACISThermalCheck):
         crm_file.close()
 
         # Read in the FP Sensitive Nopref file and form nopref array from it.
-        nopref_array = process_nopref_list(self.fps_nopref)
+        nopref_array = process_nopref_list(self.args.fps_nopref)
 
         # Get commanded states and set initial temperature
         states, state0 = self.get_states(tlm, T_init)
@@ -242,73 +239,6 @@ class ACISFPCheck(ACISThermalCheck):
         return dict(states=states, times=model.times, temps=temps,
                     plots=plots, ACIS_I_viols=viols[0], ACIS_S_viols=viols[1],
                     cti_viols=viols[2], fp_sens_viols=viols[3])
-
-    def driver(self):
-        """
-        The main interface to all of ACISFPCheck's functions.
-        This method must be called by the particular thermal model
-        implementation to actually run the code and make the webpage.
-        """
-        self.fps_nopref = self.args.fps_nopref
-
-        proc = self._setup_proc_and_logger(self.args)
-
-        is_weekly_load = self.args.backstop_file is not None
-        tstart, tstop, tnow = self._determine_times(self.args.run_start,
-                                                    is_weekly_load)
-
-        # Get the telemetry values which will be used
-        # for prediction and validation
-        tlm = self.get_telem_values(min(tstart, tnow), days=self.args.days)
-
-        # make predictions on a backstop file if defined
-        if self.args.backstop_file is not None:
-            pred = self.make_week_predict(tstart, tstop, tlm, self.args.T_init,
-                                          self.args.model_spec, self.args.outdir)
-        else:
-            pred = defaultdict(lambda: None)
-
-        # Validation
-        # Make the validation plots
-        plots_validation = self.make_validation_plots(tlm, self.args.model_spec,
-                                                      self.args.outdir, self.args.run_start)
-
-        # Determine violations of temperature validation
-        valid_viols = self.make_validation_viols(plots_validation)
-
-        # if you found some violations....
-        if len(valid_viols) > 0:
-            # generate daily plot url if outdir in expected year/day format
-            daymatch = re.match('.*(\d{4})/(\d{3})', self.args.outdir)
-            if self.bsdir is None and daymatch:
-                url = os.path.join(URL, daymatch.group(1), daymatch.group(2))
-                mylog.info('validation warning(s) at %s' % url)
-            else:
-                mylog.info('validation warning(s) in output at %s' % self.args.outdir)
-
-        # Write everything to the web page.
-        # First, write the reStructuredText file.
-
-        # Set up the context for the reST file
-        context = {'bsdir': self.bsdir,
-                   'plots': pred["plots"],
-                   'valid_viols': valid_viols,
-                   'proc': proc,
-                   'plots_validation': plots_validation,
-                   'ACIS_I_viols': pred["ACIS_I_viols"],
-                   'ACIS_S_viols': pred["ACIS_S_viols"],
-                   'fp_sens_viols': pred["fp_sens_viols"],
-                   'cti_viols': pred["cti_viols"]}
-
-        template_path = os.path.join(model_path, 'templates')
-
-        self.write_index_rst(self.bsdir, self.args.outdir, context, 
-                             template_path=template_path)
-
-        # Second, convert reST to HTML
-        self.rst_to_html(self.args.outdir, proc)
-
-        return
 
     def make_prediction_viols(self, states, times, temps, load_start,
                               obs_with_sensitivity, nopref_array):
