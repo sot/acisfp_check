@@ -16,7 +16,6 @@ from __future__ import print_function
 # Use Agg backend for command-line (non-interactive) operation
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 
 import glob
 from Ska.Matplotlib import pointpair, \
