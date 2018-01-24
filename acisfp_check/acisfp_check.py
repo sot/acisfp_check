@@ -21,7 +21,7 @@ import glob
 from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
 import Ska.engarchive.fetch_sci as fetch
-from Chandra.Time import DateTime, date2secs
+from Chandra.Time import DateTime
 from collections import defaultdict
 import numpy as np
 import xija
