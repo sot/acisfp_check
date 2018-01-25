@@ -217,11 +217,11 @@ class ACISFPCheck(ACISThermalCheck):
         :param temps: dict of temperatures
         :param tstart: load start time
         :rtype: dict of review information including plot file names
-    
-        This function assumes that ACIS Ops LR has been run and that the directory 
+
+        This function assumes that ACIS Ops LR has been run and that the directory
         is populated with
         """
-    
+
         # Gather perigee passages
         perigee_passages = self._gather_perigee(times[0], tstart)
 
@@ -236,14 +236,14 @@ class ACISFPCheck(ACISThermalCheck):
         # number of ccd's, filter out CTI observations, and a range of exposure 
         # times.
         extract_and_filter = ObsidFindFilter()
-    
+
         # extract the OBSID's from the commanded states. NOTE: this contains all
         # observations including CTI runs and HRC observations
         observation_intervals = extract_and_filter.find_obsid_intervals(states, None)
-    
+
         # Filter out any HRC science observations BUT keep ACIS CTI observations
         acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
-    
+
         # Ok so now you have all the ACIS observations collected. Also,
         # they have been identified by ObsidFindFilter as to who is in the focal plane.
         # Some apps, like this one, care about FP_TEMP sensitivity. Some do not. 
@@ -253,11 +253,11 @@ class ACISFPCheck(ACISThermalCheck):
         # directory,
         # read each line, extract the OBSID and add that to a list.
         sensefile = open(self.bsdir + '/fp_sensitive.txt', 'r')
-    
+
         # The list_of_sensitive_obs is the list of all FP TEMP sensitive 
         # observations extracted from the file in the load review directory
         list_of_sensitive_obs = []
-    
+
         # Get the list of FP_TEMP sensitive observations
         for eachline in sensefile.readlines()[1:]:
             # Extract the OBSID from each line; the obsid is in the second
@@ -268,15 +268,15 @@ class ACISFPCheck(ACISThermalCheck):
             list_of_sensitive_obs.append(eachline.split()[1])
         # Done with the file - close it
         sensefile.close()
-    
-        # Now that you have the latest list of temperature sensitive OBSID's, 
+
+        # Now that you have the latest list of temperature sensitive OBSID's,
         # run through each observation and append either "*FP SENS*" or
-        # "NOT FP SENS" to the end of each observation. 
-    
+        # "NOT FP SENS" to the end of each observation.
+
         # Now run through the observation list attribute of the ObsidFindFilter class
         for eachobservation in acis_and_cti_obs:
             # Pull the obsid from the observation and turn it into a string
-    
+
             obsid = str(extract_and_filter.get_obsid(eachobservation))
             # See if it's in the sensitive list. If so, indicate whether or
             # not this observation is FP Senstive in the new list. This will be
@@ -285,200 +285,68 @@ class ACISFPCheck(ACISThermalCheck):
                 eachobservation.append(True)
             else:
                 eachobservation.append(False)
-    
+
             self.obs_with_sensitivity.append(eachobservation)
-    
-        #
-        # create an empty dictionary called plots to contain the returned 
+
+        # create an empty dictionary called plots to contain the returned
         # figures, axes 1  and axes 2 of the plot_two call
         plots = {}
-    
+
         # Start time of loads being reviewed expressed in units for plotdate()
         load_start = cxctime2plotdate([tstart])[0]
         # Value for left side of plots
         plot_start = max(load_start-2.0, cxctime2plotdate([times[0]])[0])
 
-        #
-        # Make  plots of FPTEMP and pitch vs time 
-        #
-        #
-        # For each MSID in the loop statement, make a plot from -120 to 20
-        #   - kind of a superfluous loop in this case.
-        #
-        for fig_id, msid in enumerate((self.name,)):
-            # -----------------------------------------------------
-            #
-            #   PLOT 1 -  fptemp_11 plt with ylim from -120 to -90
-            # 
-            # -----------------------------------------------------
-            plots[msid+"_1"] = plot_two(fig_id=fig_id + 1,
-                                        x=times,
-                                        y=temps[msid],
-                                        x2=pointpair(states['tstart'], states['tstop']),
-                                        y2=pointpair(states['pitch']),
-                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                        xlabel='Date',
-                                        ylabel='Temperature (C)',
-                                        ylabel2='Pitch (deg)',
-                                        xmin=plot_start,
-                                        ylim=(-120, -90),
-                                        ylim2=(40, 180),
-                                        figsize=(12, 6))
-            plots[msid+"_1"]['ax'].axhline(self.acis_i_limit, linestyle='--', color='red',
-                                           linewidth=2.0)
-            # Add a vertical line to mark the start time of the load
-            plots[msid+"_1"]['ax'].axvline(load_start, linestyle='-', color='g',
-                                           linewidth=2.0)
+        w1 = None
+        # Make plots of FPTEMP and pitch vs time, looping over
+        # three different temperature ranges
+        ylim = [(-120, -90), (-120, 119), (-120.0, -111.5)]
+        ypos = [-110.0, -119.35, -116]
+        capwidth = [2.0, 0.1, 0.4]
+        textypos = [-108.0, -119.3, -115.7]
+        fontsize = [12, 9, 9]
+        for i in range(3):
+            name = "%s_%d" % (self.name, i+1)
+            plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
+                                   x2=pointpair(states['tstart'], states['tstop']),
+                                   y2=pointpair(states['pitch']),
+                                   title=MSID[self.name] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   xlabel='Date', ylabel='Temperature (C)',
+                                   ylabel2='Pitch (deg)', xmin=plot_start,
+                                   ylim=ylim[i], ylim2=(40, 180),
+                                   figsize=(12, 6), width=w1, load_start=load_start)
+            # Draw a horizontal line indicating the FP Sensitive Observation Cut off
+            plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
+            # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
+            plots[name]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=1.0)
+            # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
+            plots[name]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=1.0)
 
-            # The next line is to ensure that the width of the axes
-            # of all the weekly prediction plots are the same--used
-            # later down in the function
-            w1, h1 = plots[msid+"_1"]['fig'].get_size_inches()
+            # Get the width of this plot to make the widths of all the
+            # prediction plots the same
+            if i == 0:
+                w1, _ = plots[name]['fig'].get_size_inches()
 
-            #
             # Now plot any perigee passages that occur between xmin and xmax
             # for eachpassage in perigee_passages:
-            paint_perigee(perigee_passages, states, plots, msid+"_1")
-    
+            paint_perigee(perigee_passages, states, plots, name)
+
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
-            ypos = -110.0
-            endcapstart = -111.0
-            endcapstop = -109.0
-            textypos = -108.0
-            fontsize = 12
             draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
-                        plots, msid+"_1", ypos, endcapstart, endcapstop, textypos, 
-                        fontsize, plot_start)
+                        plots, name, ypos[i], ypos[i]-0.5*capwidth[i], ypos[i]+0.5*capwidth[i],
+                        textypos[i], fontsize[i], plot_start)
+
             # Build the file name and output the plot to a file
-            filename = MSID[msid].lower() + 'M120toM90.png'
+            filename = MSID[self.name].lower() + 'M%dto%d.png' % (-ylim[i][0], -ylim[i][1])
             outfile = os.path.join(outdir, filename)
             mylog.info('Writing plot file %s' % outfile)
-            plots[msid+"_1"]['fig'].savefig(outfile)
-            plots[msid+"_1"]['filename'] = filename
-    
-            # ------------------------------------------------------
-            #
-            #   PLOT 2 -  fptemp_11 plt with ylim from -120 to -119
-            # 
-            # ------------------------------------------------------
-            #
-            plots[msid+"_2"] = plot_two(fig_id=fig_id + 1,
-                                        x=times,
-                                        y=temps[msid],
-                                        x2=pointpair(states['tstart'], states['tstop']),
-                                        y2=pointpair(states['pitch']),
-                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                        xlabel='Date',
-                                        ylabel='Temperature (C)',
-                                        ylabel2='Pitch (deg)',
-                                        ylim=(-120, -119),
-                                        ylim2=(40, 180),
-                                        xmin=plot_start,
-                                        figsize=(12, 6))
-            # Add a vertical line to mark the start time of the load
-            plots[msid+"_2"]['ax'].axvline(load_start, linestyle='-', color='g',
-                                           linewidth=2.0)
-            # The next several lines ensure that the width of the axes
-            # of all the weekly prediction plots are the same.
-            w2, h2 = plots[msid+"_2"]['fig'].get_size_inches()
-            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
-            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
-            plots[msid+"_2"]['fig'].subplots_adjust(left=lm, right=rm)
-
-            #
-            # Now plot any perigee passages that occur between xmin and xmax
-            #
-            paint_perigee(perigee_passages, states, plots, msid+"_2")
-    
-            # Now draw horizontal lines on the plot running form start to stop
-            # and label them with the Obsid
-            ypos = -119.35
-            endcapstart = ypos + 0.05
-            endcapstop = ypos - 0.05
-            textypos = ypos + 0.05
-            fontsize = 9
-            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
-                        plots, msid+"_2", ypos, endcapstart, endcapstop, textypos, 
-                        fontsize, plot_start)
-            # Build the file name and output the file
-            filename = MSID[msid].lower() + 'M120toM119.png'
-            outfile = os.path.join(outdir, filename)
-            mylog.info('   Writing plot file %s' % outfile)
-            plots[msid+"_2"]['fig'].savefig(outfile)
-            plots[msid+"_2"]['filename'] = filename
-    
-            # ------------------------------------------------------
-            #
-            #   PLOT 3 -  fptemp_11 plt with ylim from -120 to -112
-            # 
-            # ------------------------------------------------------
-            #
-            plots[msid+"_3"] = plot_two(fig_id=fig_id + 1,
-                                        x=times,
-                                        y=temps[msid],
-                                        x2=pointpair(states['tstart'], states['tstop']),
-                                        y2=pointpair(states['pitch']),
-                                        title=MSID[msid] + " (ACIS-I obs. in red; ACIS-S in green)",
-                                        xlabel='Date',
-                                        ylabel='Temperature (C)',
-                                        ylabel2='Pitch (deg)',
-                                        ylim=(-120, -111.5),
-                                        ylim2=(40, 180),
-                                        xmin=plot_start,
-                                        figsize=(12, 6))
-            # Add a vertical line to mark the start time of the load
-            plots[msid+"_3"]['ax'].axvline(load_start, linestyle='-', color='g',
-                                           linewidth=2.0)
-            # The next several lines ensure that the width of the axes                                             
-            # of all the weekly prediction plots are the same.                                                      
-            w2, h2 = plots[msid+"_3"]['fig'].get_size_inches()
-            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
-            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
-            plots[msid+"_3"]['fig'].subplots_adjust(left=lm, right=rm)
-
-            #
-            # Now plot any perigee passages that occur between xmin and xmax
-            #
-            paint_perigee(perigee_passages, states, plots, msid+"_3")
-    
-            # Now draw horizontal lines on the plot running from start to stop
-            # and label them with the Obsid
-            ypos = -116
-            endcapstart = -116.2
-            endcapstop = -115.8
-            textypos = -115.7
-            fontsize = 9
-    
-            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
-                        plots, msid+"_3", ypos, endcapstart, endcapstop, textypos, 
-                        fontsize, plot_start)
-    
-            # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-            plots[msid+"_3"]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
-            # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-            plots[msid+"_3"]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=1.0)
-            # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-            plots[msid+"_3"]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=1.0)
-            # The next several lines ensure that the width of the axes
-            # of all the weekly prediction plots are the same.                                                       
-            w2, h2 = plots[msid+"_3"]['fig'].get_size_inches()
-            lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
-            rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
-            plots[msid+"_3"]['fig'].subplots_adjust(left=lm, right=rm)
-
-            # Build the file name and output the file
-            filename = MSID[msid].lower() + 'M120toM112.png'
-            outfile = os.path.join(outdir, filename)
-            mylog.info('   Writing plot file %s' % outfile)
-            plots[msid+"_3"]['fig'].savefig(outfile)
-            plots[msid+"_3"]['filename'] = filename
-
-        # end of for fig_id, msid in enumerate(('fptemp',)):
+            plots[name]['fig'].savefig(outfile)
+            plots[name]['filename'] = filename
 
         # Now create the plot of ACIS CCD number and Sim-Z position
         plots['pow_sim'] = plot_two(
-            fig_id=fig_id + 1,
+            fig_id=4,
             title='ACIS CCDs and SIM-Z position',
             xlabel='Date',
             x=pointpair(states['tstart'], states['tstop']),
@@ -490,17 +358,7 @@ class ACISFPCheck(ACISThermalCheck):
             ylabel2='SIM-Z (steps)',
             xmin=plot_start,
             ylim2=(-105000, 105000),
-            figsize=(12, 6))
-        # Add a vertical line to mark the start time of the load
-        plots['pow_sim']['ax'].axvline(load_start, linestyle='-', color='g',
-                                       linewidth=2.0)
-        # The next several lines ensure that the width of the axes
-        # of all the weekly prediction plots are the same.
-        w2, h2 = plots["pow_sim"]['fig'].get_size_inches()
-        lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
-        rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
-        plots["pow_sim"]['fig'].subplots_adjust(left=lm, right=rm)
-
+            figsize=(12, 6), width=w1, load_start=load_start)
         filename = 'pow_sim.png'
         outfile = os.path.join(outdir, filename)
         mylog.info('   Writing plot file %s' % outfile)
@@ -509,24 +367,15 @@ class ACISFPCheck(ACISThermalCheck):
 
         # Make a plot of off-nominal roll
         plots['roll'] = plot_one(
-            fig_id=fig_id+1,
+            fig_id=5,
             title='Off-Nominal Roll',
             xlabel='Date',
             x=pointpair(states['tstart'], states['tstop']),
             y=pointpair(calc_off_nom_rolls(states)),
             ylabel='Roll Angle (deg)',
-            ylim=(-20.0, 20.0), 
+            ylim=(-20.0, 20.0),
             xmin=plot_start,
-            figsize=(12, 6))
-        # Add a vertical line to mark the start time of the load
-        plots['roll']['ax'].axvline(load_start, linestyle='-', color='g',
-                                    linewidth=2.0)
-        # The next several lines ensure that the width of the axes
-        # of all the weekly prediction plots are the same.
-        w2, h2 = plots['roll']['fig'].get_size_inches()
-        lm = plots[msid+"_1"]['fig'].subplotpars.left*w1/w2
-        rm = plots[msid+"_1"]['fig'].subplotpars.right*w1/w2
-        plots['roll']['fig'].subplots_adjust(left=lm, right=rm)
+            figsize=(12, 6), width=w1, load_start=load_start)
         filename = 'roll.png'
         outfile = os.path.join(outdir, filename)
         mylog.info('Writing plot file %s' % outfile)
