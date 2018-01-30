@@ -48,7 +48,6 @@ default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 #
 # INIT
 #
-MSID = {"acisfp": "FPTEMP"}
 VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
                      'TSCPOS': [(1, 2.5), (99, 2.5)]
                      }
@@ -135,10 +134,10 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
 
 class ACISFPCheck(ACISThermalCheck):
 
-    def __init__(self, msid, name, MSIDs, validation_limits,
+    def __init__(self, msid, name, validation_limits,
                  hist_limit, calc_model, args, other_telem=None,
                  other_map=None):
-        super(ACISFPCheck, self).__init__(msid, name, MSIDs, validation_limits,
+        super(ACISFPCheck, self).__init__(msid, name, validation_limits,
                                           hist_limit, calc_model, args, 
                                           other_telem=other_telem, other_map=other_map)
         # Set specific limits for the focal plane model
@@ -310,7 +309,7 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
                                    x2=pointpair(states['tstart'], states['tstop']),
                                    y2=pointpair(states['pitch']),
-                                   title=MSID[self.name] + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
                                    ylim=ylim[i], ylim2=(40, 180),
@@ -749,7 +748,7 @@ def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
              "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
-    acisfp_check = ACISFPCheck("fptemp", "acisfp", MSID, VALIDATION_LIMITS, 
+    acisfp_check = ACISFPCheck("fptemp", "acisfp", VALIDATION_LIMITS, 
                                HIST_LIMIT, calc_model, args,
                                other_telem=['1dahtbon'],
                                other_map={'1dahtbon': 'dh_heater',
