@@ -31,7 +31,7 @@ from acis_thermal_check import \
     get_options, \
     mylog, get_acis_limits
 from acis_thermal_check.utils import \
-    plot_two, plot_one
+    plot_two
 import os
 import sys
 from kadi import events
