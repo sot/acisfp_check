@@ -337,7 +337,7 @@ class ACISFPCheck(ACISThermalCheck):
                         textypos[i], fontsize[i], plot_start)
 
             # Build the file name and output the plot to a file
-            filename = MSID[self.name].lower() + 'M%dto%d.png' % (-ylim[i][0], -ylim[i][1])
+            filename = self.msid.lower() + 'M%dto%d.png' % (-ylim[i][0], -ylim[i][1])
             outfile = os.path.join(outdir, filename)
             mylog.info('Writing plot file %s' % outfile)
             plots[name]['fig'].savefig(outfile)
@@ -423,7 +423,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        viols["cti"] = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
+        viols["cti"] = search_obsids_for_viols(self.msid, self.fp_sens_limit,
                                                cti_only_obs, temp, times, load_start)
 
         # ------------------------------------------------------------
@@ -432,7 +432,7 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
-        viols["fp_sens"] = search_obsids_for_viols(self.msid, self.name, self.fp_sens_limit,
+        viols["fp_sens"] = search_obsids_for_viols(self.msid, self.fp_sens_limit,
                                                    fp_sense_without_noprefs, temp, times,
                                                    load_start)
 
@@ -443,7 +443,7 @@ class ACISFPCheck(ACISThermalCheck):
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        viols["ACIS_S"] = search_obsids_for_viols(self.msid, self.name, self.acis_s_limit,
+        viols["ACIS_S"] = search_obsids_for_viols(self.msid, self.acis_s_limit,
                                                   ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
@@ -454,7 +454,7 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        viols["ACIS_I"] = search_obsids_for_viols(self.msid, self.name, self.acis_i_limit,
+        viols["ACIS_I"] = search_obsids_for_viols(self.msid, self.acis_i_limit,
                                                   ACIS_I_obs, temp, times, load_start)
 
         return viols
@@ -480,7 +480,7 @@ class ACISFPCheck(ACISThermalCheck):
         """
         return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
 
-def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times,
+def search_obsids_for_viols(msid, plan_limit, observations, temp, times,
                             load_start):
     """
     Given a planning limit and a list of observations, find those time intervals
@@ -552,7 +552,7 @@ def search_obsids_for_viols(msid, name, plan_limit, observations, temp, times,
 
             mylog.info('   VIOLATION: %s  exceeds planning limit of %.2f '
                         'degC from %s to %s'
-                        % (MSID[name], plan_limit, viol['datestart'],
+                        % (msid, plan_limit, viol['datestart'],
                         viol['datestop']))
 
     # Finished - return the violations list
