@@ -26,7 +26,7 @@ Temperatures          `<temperatures.dat>`_
 States                `<states.dat>`_
 ====================  =============================================
 
-{% if ACIS_I_viols.fptemp %}
+{% if viols.ACIS_I.fptemp %}
 ACIS-I FP_TEMP -114 deg C Violations
 ------------------------------------
 =====================  =====================  ==================  ==================
@@ -41,7 +41,7 @@ No ACIS-I -114 deg C FP_TEMP Violations
 {% endif %}
 
 
-{% if ACIS_S_viols.fptemp %}
+{% if viols.ACIS_S.fptemp %}
 ACIS-S FP_TEMP -112 deg C Violations
 ------------------------------------
 =====================  =====================  ==================  ==================
