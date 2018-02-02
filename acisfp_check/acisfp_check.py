@@ -299,7 +299,7 @@ class ACISFPCheck(ACISThermalCheck):
         w1 = None
         # Make plots of FPTEMP and pitch vs time, looping over
         # three different temperature ranges
-        ylim = [(-120, -90), (-120, 119), (-120.0, -111.5)]
+        ylim = [(-120, -90), (-120, -119), (-120.0, -111.5)]
         ypos = [-110.0, -119.35, -116]
         capwidth = [2.0, 0.1, 0.4]
         textypos = [-108.0, -119.3, -115.7]
@@ -337,14 +337,14 @@ class ACISFPCheck(ACISThermalCheck):
                         textypos[i], fontsize[i], plot_start)
 
             # Build the file name and output the plot to a file
-            filename = self.msid.lower() + 'M%dto%d.png' % (-ylim[i][0], -ylim[i][1])
+            filename = self.msid.lower() + 'M%dtoM%d.png' % (-ylim[i][0], -ylim[i][1])
             outfile = os.path.join(outdir, filename)
             mylog.info('Writing plot file %s' % outfile)
             plots[name]['fig'].savefig(outfile)
             plots[name]['filename'] = filename
 
         self._make_state_plots(plots, 3, w1, plot_start,
-                               outdir, states, load_start)
+                               outdir, states, load_start, figsize=(12, 6))
 
         return plots
 
