@@ -423,8 +423,9 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        viols["cti"] = self.search_obsids_for_viols(self.fp_sens_limit, cti_only_obs, 
-                                                    temp, times, load_start)
+        viols["cti"] = self.search_obsids_for_viols("CTI", self.fp_sens_limit, 
+                                                    cti_only_obs, temp, times, 
+                                                    load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -432,7 +433,7 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
-        viols["fp_sens"] = self.search_obsids_for_viols(self.fp_sens_limit,
+        viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
                                                         fp_sense_without_noprefs, 
                                                         temp, times, load_start)
         # --------------------------------------------------------------
@@ -442,8 +443,8 @@ class ACISFPCheck(ACISThermalCheck):
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        viols["ACIS_S"] = self.search_obsids_for_viols(self.acis_s_limit, ACIS_S_obs, 
-                                                       temp, times, load_start)
+        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S", self.acis_s_limit, 
+                                                       ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
         #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run.
@@ -453,8 +454,8 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        viols["ACIS_I"] = self.search_obsids_for_viols(self.acis_i_limit, ACIS_I_obs, 
-                                                       temp, times, load_start)
+        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I", self.acis_i_limit, 
+                                                       ACIS_I_obs, temp, times, load_start)
 
         return viols
 
