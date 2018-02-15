@@ -33,7 +33,7 @@ ACIS-I FP_TEMP -114 deg C Violations
 Date start             Date stop              Max temperature     Obsids
 =====================  =====================  ==================  ==================
 {% for viol in viols.ACIS_I.fptemp %}
-{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}            {{viol.obsid}}
+{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}             {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
@@ -48,7 +48,7 @@ ACIS-S FP_TEMP -112 deg C Violations
 Date start             Date stop              Max temperature     Obsids
 =====================  =====================  ==================  ==================
 {% for viol in viols.ACIS_S.fptemp %}
-{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}            {{viol.obsid}}
+{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}             {{viol.obsid}}
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
