@@ -658,7 +658,7 @@ class ObsidFindFilter():
     # general_g_i 
     #
     #---------------------------------------------------------------------
-    def general_g_i(self, start_time='2011:001', stop_time=get_last_data_date(), 
+    def general_g_i(self, start_time='2011:001', stop_time=None, 
                     exptime=None, noCTI=False, pitchrange=None): 
         """
         Given: A Start and Stop time
@@ -670,6 +670,8 @@ class ObsidFindFilter():
                  and stop_time; apply the user specified 
                  filters; then return the list
         """
+        if stop_time is None:
+            stop_time = get_last_data_date()
         if exptime is None:
             exptime = []
         if pitchrange is None:
