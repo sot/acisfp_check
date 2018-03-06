@@ -251,7 +251,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Open the sensitive observation list file, which is found in the LR 
         # directory,
         # read each line, extract the OBSID and add that to a list.
-        sensefile = open(self.bsdir + '/fp_sensitive.txt', 'r')
+        sensefile = open(os.path.join(self.bsdir, 'fp_sensitive.txt'), 'r')
 
         # The list_of_sensitive_obs is the list of all FP TEMP sensitive 
         # observations extracted from the file in the load review directory
