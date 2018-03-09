@@ -480,7 +480,7 @@ class ACISFPCheck(ACISThermalCheck):
         """
         return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
 
-    def search_obsids_for_viols(self, limit_type, limit, observations, temp, times,
+    def search_obsids_for_viols(self, limit_name, limit, observations, temp, times,
                                 load_start):
         """
         Given a planning limit and a list of observations, find those time intervals
@@ -501,7 +501,8 @@ class ACISFPCheck(ACISThermalCheck):
             if obs_tstart > load_start:
                 idxs = (times >= obs_tstart) & (times <= obs_tstop)
                 viols = self._make_prediction_viols(times[idxs], temp[idxs],
-                                                    load_start, limit, limit_type)
+                                                    load_start, limit, limit_name,
+                                                    "max")
                 # If we have flagged any violations, record the obsid for each
                 # and add them to the list
                 if len(viols) > 0:
