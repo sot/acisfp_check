@@ -459,27 +459,6 @@ class ACISFPCheck(ACISThermalCheck):
 
         return viols
 
-    def get_histogram_mask(self, tlm, limit):
-        """
-        This method determines which values of telemetry
-        should be used to construct the temperature
-        histogram plots, using limits provided by the
-        calling program to mask the array via a logical
-        operation.
-
-        The implementation here in ACISFPCheck is to plot
-        values which fall between a lower and an upper
-        limit.
-
-        Parameters
-        ----------
-        tlm : NumPy record array
-            NumPy record array of telemetry
-        limit : array of floats
-            The limit or limits to use in the masking.
-        """
-        return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
-
     def search_obsids_for_viols(self, limit_name, limit, observations, temp, times,
                                 load_start):
         """
