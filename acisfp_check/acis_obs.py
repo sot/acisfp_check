@@ -658,7 +658,7 @@ class ObsidFindFilter():
                  filters; then return the list
         """
         if stop_time is None:
-            stop_time = fetch.get_time_range("1DPAMZT", format="date")[-1]
+            stop_time = fetch.get_time_range("FPTEMP_11", format="date")[-1]
         if exptime is None:
             exptime = []
         if pitchrange is None:
