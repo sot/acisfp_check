@@ -20,19 +20,6 @@ from Chandra.Time import DateTime
 import Ska.engarchive.fetch_sci as fetch
 from Ska.DBI import DBI
 
-#------------------------------------------------------------------
-#
-# get_last_data_date
-#
-#------------------------------------------------------------------
-def get_last_data_date():
-    """
-    Find the last date of the data that exists in the 
-    SKA Engineering Archive
-    """
-    tdata = fetch.MSID('1DPAMZT', '2012:100', '2024:364')
-    return DateTime(tdata.times[-1]).date
-
 #----------------------------------------------------------------
 #
 # who_in_fp.py
@@ -658,7 +645,7 @@ class ObsidFindFilter():
     # general_g_i 
     #
     #---------------------------------------------------------------------
-    def general_g_i(self, start_time='2011:001', stop_time=get_last_data_date(), 
+    def general_g_i(self, start_time='2011:001', stop_time=None, 
                     exptime=None, noCTI=False, pitchrange=None): 
         """
         Given: A Start and Stop time
@@ -670,6 +657,8 @@ class ObsidFindFilter():
                  and stop_time; apply the user specified 
                  filters; then return the list
         """
+        if stop_time is None:
+            stop_time = fetch.get_time_range("FPTEMP_11", format="date")[-1]
         if exptime is None:
             exptime = []
         if pitchrange is None:

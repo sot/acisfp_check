@@ -251,7 +251,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Open the sensitive observation list file, which is found in the LR 
         # directory,
         # read each line, extract the OBSID and add that to a list.
-        sensefile = open(self.bsdir + '/fp_sensitive.txt', 'r')
+        sensefile = open(os.path.join(self.bsdir, 'fp_sensitive.txt'), 'r')
 
         # The list_of_sensitive_obs is the list of all FP TEMP sensitive 
         # observations extracted from the file in the load review directory
@@ -423,8 +423,9 @@ class ACISFPCheck(ACISThermalCheck):
         # Collect any -118.7C violations of CTI runs. These are not
         # load killers but need to be reported
 
-        viols["cti"] = search_obsids_for_viols(self.msid, self.fp_sens_limit,
-                                               cti_only_obs, temp, times, load_start)
+        viols["cti"] = self.search_obsids_for_viols("CTI", self.fp_sens_limit, 
+                                                    cti_only_obs, temp, times, 
+                                                    load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -432,10 +433,9 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
-        viols["fp_sens"] = search_obsids_for_viols(self.msid, self.fp_sens_limit,
-                                                   fp_sense_without_noprefs, temp, times,
-                                                   load_start)
-
+        viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
+                                                        fp_sense_without_noprefs, 
+                                                        temp, times, load_start)
         # --------------------------------------------------------------
         #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
         #  These are load killers
@@ -443,8 +443,8 @@ class ACISFPCheck(ACISThermalCheck):
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        viols["ACIS_S"] = search_obsids_for_viols(self.msid, self.acis_s_limit,
-                                                  ACIS_S_obs, temp, times, load_start)
+        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S", self.acis_s_limit, 
+                                                       ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
         #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run.
@@ -454,109 +454,43 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        viols["ACIS_I"] = search_obsids_for_viols(self.msid, self.acis_i_limit,
-                                                  ACIS_I_obs, temp, times, load_start)
+        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I", self.acis_i_limit, 
+                                                       ACIS_I_obs, temp, times, load_start)
 
         return viols
 
-    def get_histogram_mask(self, tlm, limit):
+    def search_obsids_for_viols(self, limit_name, limit, observations, temp, times,
+                                load_start):
         """
-        This method determines which values of telemetry
-        should be used to construct the temperature
-        histogram plots, using limits provided by the
-        calling program to mask the array via a logical
-        operation.
-
-        The implementation here in ACISFPCheck is to plot
-        values which fall between a lower and an upper
-        limit.
-
-        Parameters
-        ----------
-        tlm : NumPy record array
-            NumPy record array of telemetry
-        limit : array of floats
-            The limit or limits to use in the masking.
+        Given a planning limit and a list of observations, find those time intervals
+        where the temp gets warmer than the planning limit and identify which 
+        observations (if any) include part or all of those intervals.
         """
-        return (tlm[self.msid] >= limit[0]) & (tlm[self.msid] <= limit[1])
+        # create an instance of ObsidFindFilter()
+        eandf = ObsidFindFilter()
 
-def search_obsids_for_viols(msid, plan_limit, observations, temp, times,
-                            load_start):
-    """
-    Given a planning limit and a list of observations, find those time intervals
-    where the temp gets warmer than the planning limit and identify which 
-    observations (if any) include part or all of those intervals.
-    """
+        viols_list = defaultdict(list)
 
-    # create an instance of ObsidFindFilter()
-    eandf = ObsidFindFilter()
-
-    viols_list = defaultdict(list)
-
-    bad = np.concatenate([[False], temp >= plan_limit, [False]])
-
-    # changes is a list of lists. Each sublist is a tuple which
-    # contains indices into the times list. 0 = start times
-    # and 1 = stop time
-    changes = np.flatnonzero(bad[1:] != bad[:-1]).reshape(-1, 2)
-
-    # Add any obs violations to the viols_list
-    for change in changes:
-        tstart = times[change[0]]
-        tstop = times[change[1] - 1]
-
-        # Only report violations which occur after the load being
-        # reviewed starts.
-        in_load = tstart > load_start or \
-                  (tstart < load_start < tstop)
-
-        if not in_load:
-            continue
-
-        # find the observations that contains all or part of this time interval
-        #  add this to the violations list "viols[msid]"
-        #
-        # First create an empty obsid list. This list represents all the
-        # observations that contain the violation represented by this change
-        # (if any)
-        obsid_list = ''
- 
-        # See if any  observation that contains this time interval
-        # If it is, add this to the violations list "viols_list[msid]"
+        # Run through all observations
         for eachobs in observations:
             # Get the observation tstart and tstop times, and obsid
             obs_tstart = eandf.get_tstart(eachobs)
             obs_tstop = eandf.get_tstop(eachobs)
+            # If the observation is in this load, let's look at it
+            if obs_tstart > load_start:
+                idxs = (times >= obs_tstart) & (times <= obs_tstop)
+                viols = self._make_prediction_viols(times[idxs], temp[idxs],
+                                                    load_start, limit, limit_name,
+                                                    "max")
+                # If we have flagged any violations, record the obsid for each
+                # and add them to the list
+                if len(viols) > 0:
+                    for viol in viols:
+                        viol["obsid"] = str(eandf.get_obsid(eachobs))
+                    viols_list[self.msid] += viols
 
-            # If either tstart is inside the obs tstart/tstop
-            # OR
-            #    tstop is inside the obs tstart/tstop
-            if obs_tstop >= tstart >= obs_tstart or \
-               obs_tstop >= tstop >= obs_tstart or \
-               (tstart <= obs_tstart and tstop >= obs_tstop):
-                # Fetch the obsid for this observation and append to list
-                obsid_list = obsid_list + ' ' + str(eandf.get_obsid(eachobs))
-
-        # If obsid_list is not empty, then create the violation
-        if obsid_list != '':
-            # Figure out the max temp for the
-            # Then create the violation
-            viol = {'datestart': DateTime(times[change[0]]).date,
-                    'datestop': DateTime(times[change[1] - 1]).date,
-                    'maxtemp': temp[change[0]:change[1]].max(),
-                    'obsid': obsid_list
-                   }
-
-            # .........and then add it to the violations list
-            viols_list[msid].append(viol)
-
-            mylog.info('   VIOLATION: %s  exceeds planning limit of %.2f '
-                        'degC from %s to %s'
-                        % (msid, plan_limit, viol['datestart'],
-                        viol['datestop']))
-
-    # Finished - return the violations list
-    return viols_list
+        # Finished - return the violations list
+        return viols_list
 
 #----------------------------------------------------------------------
 #
