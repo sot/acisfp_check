@@ -35,6 +35,7 @@ from acis_thermal_check.utils import \
 import os
 import sys
 from kadi import events
+import Ska.Numpy
 
 #
 # Import ACIS-specific observation extraction, filtering 
@@ -132,6 +133,7 @@ def calc_model(model_spec, states, start, stop, T_acisfp=None,
 
     return model
 
+
 class ACISFPCheck(ACISThermalCheck):
 
     def __init__(self, msid, name, validation_limits,
@@ -204,7 +206,54 @@ class ACISFPCheck(ACISThermalCheck):
         # Done with the CRM Pad Time file - close it
         crm_file.close()
 
-        return perigee_passages
+        self.perigee_passages = perigee_passages
+
+    def _make_state_plots(self, plots, num_figs, w1, plot_start,
+                          outdir, states, load_start, figsize=(8.5, 4.0)):
+        # Make a plot of ACIS CCDs and SIM-Z position
+        plots['pow_sim'] = plot_two(
+            fig_id=num_figs+1,
+            title='ACIS CCDs and SIM-Z position',
+            xlabel='Date',
+            x=pointpair(states['tstart'], states['tstop']),
+            y=pointpair(states['ccd_count']),
+            ylabel='CCD_COUNT',
+            ylim=(-0.1, 6.1),
+            xmin=plot_start,
+            x2=pointpair(states['tstart'], states['tstop']),
+            y2=pointpair(states['simpos']),
+            ylabel2='SIM-Z (steps)',
+            ylim2=(-105000, 105000),
+            figsize=figsize, width=w1, load_start=load_start)
+        paint_perigee(self.perigee_passages, states, plots, "pow_sim")
+        filename = 'pow_sim.png'
+        outfile = os.path.join(outdir, filename)
+        mylog.info('Writing plot file %s' % outfile)
+        plots['pow_sim']['fig'].savefig(outfile)
+        plots['pow_sim']['filename'] = filename
+
+        # Make a plot of off-nominal roll
+        plots['roll_taco'] = plot_two(
+            fig_id=num_figs+2,
+            title='Off-Nominal Roll and Earth Solid Angle in Rad FOV',
+            xlabel='Date',
+            x=pointpair(states['tstart'], states['tstop']),
+            y=pointpair(calc_off_nom_rolls(states)),
+            xmin=plot_start,
+            ylabel='Roll Angle (deg)',
+            ylim=(-20.0, 20.0),
+            x2=self.predict_model.times,
+            y2=self.predict_model.comp['earthheat__fptemp'].dvals,
+            ylabel2='Earth Solid Angle (sr)',
+            ylim2=(1.0e-3, 1.0),
+            figsize=figsize, width=w1, load_start=load_start)
+        plots['roll_taco']['ax2'].set_yscale("log")
+        paint_perigee(self.perigee_passages, states, plots, "roll_taco")
+        filename = 'roll_taco.png'
+        outfile = os.path.join(outdir, filename)
+        mylog.info('Writing plot file %s' % outfile)
+        plots['roll_taco']['fig'].savefig(outfile)
+        plots['roll_taco']['filename'] = filename
 
     def make_prediction_plots(self, outdir, states, times, temps, tstart):
         """
@@ -222,7 +271,7 @@ class ACISFPCheck(ACISThermalCheck):
         """
 
         # Gather perigee passages
-        perigee_passages = self._gather_perigee(times[0], tstart)
+        self._gather_perigee(times[0], tstart)
 
         # Next we need to find all the ACIS-S observations within the start/stop
         # times so that we can paint those on the plots as well. We will get
@@ -328,7 +377,7 @@ class ACISFPCheck(ACISThermalCheck):
 
             # Now plot any perigee passages that occur between xmin and xmax
             # for eachpassage in perigee_passages:
-            paint_perigee(perigee_passages, states, plots, name)
+            paint_perigee(self.perigee_passages, states, plots, name)
 
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
@@ -492,6 +541,35 @@ class ACISFPCheck(ACISThermalCheck):
         # Finished - return the violations list
         return viols_list
 
+    def write_temps(self, outdir, times, temps):
+        """
+        Write the states record array to the file "temperatures.dat".
+
+        Parameters
+        ----------
+        outdir : string
+            The directory the file will be written to.
+        times : NumPy array
+            Times in seconds from the start of the mission
+        temps : NumPy array
+            Temperatures in Celsius
+        """
+        outfile = os.path.join(outdir, 'temperatures.dat')
+        mylog.info('Writing temperatures to %s' % outfile)
+        T = temps[self.name]
+        e = self.predict_model.comp['earthheat__fptemp'].dvals
+        temp_recs = [(times[i], DateTime(times[i]).date, T[i], e[i])
+                     for i in range(len(times))]
+        temp_array = np.rec.fromrecords(
+            temp_recs, names=('time', 'date', self.msid, 'earth_fov'))
+        fmt = {self.msid: '%.2f',
+               'time': '%.2f',
+               'earth_solid_angle': '%.7f'}
+        out = open(outfile, 'w')
+        Ska.Numpy.pprint(temp_array, fmt, out)
+        out.close()
+
+
 #----------------------------------------------------------------------
 #
 #   paint_perigee
@@ -522,14 +600,17 @@ def paint_perigee(perigee_passages, states, plots, msid):
             # Have to convert this time into the new x axis time scale necessitated by SKA
             xpos = cxctime2plotdate([DateTime(eachpassage[0]).secs])
 
+            ymin, ymax = plots[msid]['ax'].get_ylim()
+
             # now plot the line.
-            plots[msid]['ax'].vlines(xpos, -120, 20, linestyle=':', color='red', linewidth=2.0)
+            plots[msid]['ax'].vlines(xpos, ymin, ymax, linestyle=':', color='red', linewidth=2.0)
 
             # Plot the perigee passage time so long as it was specified in the CTI_report file
             if eachpassage[1] != "Not-within-load":
                 perigee_time = cxctime2plotdate([DateTime(eachpassage[1]).secs])
-                plots[msid]['ax'].vlines(perigee_time, -120, 20, linestyle=':', 
+                plots[msid]['ax'].vlines(perigee_time, ymin, ymax, linestyle=':',
                                          color='black', linewidth=2.0)
+
 
 def draw_obsids(extract_and_filter, 
                 obs_with_sensitivity, 
@@ -677,6 +758,7 @@ def process_nopref_list(filespec=default_nopref_list):
 
     # Now return the nopref array
     return nopref_array 
+
 
 def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
