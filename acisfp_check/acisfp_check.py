@@ -150,19 +150,19 @@ class ACISFPCheck(ACISThermalCheck):
         # list contains all ACIS and all CTI observations and will have the 
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
+        self.perigee_passages = []
 
     def _gather_perigee(self, run_start, load_start):
         # The first step is to build a list of all the perigee passages.
-        perigee_passages = []
 
         # Gather the perigee passages that occur from the
         # beginning of the model run up to the start of the load
         # from kadi
         rzs = events.rad_zones.filter(run_start, load_start)
         for rz in rzs:
-            perigee_passages.append([rz.start, rz.perigee])
+            self.perigee_passages.append([rz.start, rz.perigee])
         for rz in rzs:
-            perigee_passages.append([rz.stop, rz.perigee])
+            self.perigee_passages.append([rz.stop, rz.perigee])
 
         # We will get the load passages from the relevant CRM pad time file
         # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
@@ -201,12 +201,10 @@ class ACISFPCheck(ACISThermalCheck):
             passage.append(splitline[9])  # Perigee Passage time
 
             # append this passage to the passages list
-            perigee_passages.append(passage)
+            self.perigee_passages.append(passage)
 
         # Done with the CRM Pad Time file - close it
         crm_file.close()
-
-        self.perigee_passages = perigee_passages
 
     def _make_state_plots(self, plots, num_figs, w1, plot_start,
                           outdir, states, load_start, figsize=(8.5, 4.0)):
