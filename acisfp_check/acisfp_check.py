@@ -21,7 +21,7 @@ import glob
 from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
 import Ska.engarchive.fetch_sci as fetch
-from Chandra.Time import DateTime
+from Chandra.Time import DateTime, secs2date
 from collections import defaultdict
 import numpy as np
 import xija
@@ -36,6 +36,7 @@ import os
 import sys
 from kadi import events
 import Ska.Numpy
+from astropy.table import Table
 
 #
 # Import ACIS-specific observation extraction, filtering 
@@ -541,7 +542,8 @@ class ACISFPCheck(ACISThermalCheck):
 
     def write_temps(self, outdir, times, temps):
         """
-        Write the states record array to the file "temperatures.dat".
+        Write the states record array to the file "temperatures.dat"
+        and the Earth solid angles to "earth_solid_angles.dat".
 
         Parameters
         ----------
@@ -552,21 +554,16 @@ class ACISFPCheck(ACISThermalCheck):
         temps : NumPy array
             Temperatures in Celsius
         """
-        outfile = os.path.join(outdir, 'temperatures.dat')
-        mylog.info('Writing temperatures to %s' % outfile)
-        T = temps[self.name]
+        super(ACISFPCheck, self).write_temps(outdir, times, temps)
+        outfile = os.path.join(outdir, 'earth_solid_angles.dat')
+        mylog.info('Writing Earth solid angles to %s' % outfile)
         e = self.predict_model.comp['earthheat__fptemp'].dvals
-        temp_recs = [(times[i], DateTime(times[i]).date, T[i], e[i])
-                     for i in range(len(times))]
-        temp_array = np.rec.fromrecords(
-            temp_recs, names=('time', 'date', self.msid, 'earth_fov'))
-        fmt = {self.msid: '%.2f',
-               'time': '%.2f',
-               'earth_solid_angle': '%.7f'}
-        out = open(outfile, 'w')
-        Ska.Numpy.pprint(temp_array, fmt, out)
-        out.close()
-
+        efov_table = Table([times, secs2date(times), e],
+                           names=['time', 'date', 'earth_solid_angle'],
+                           copy=False)
+        efov_table['time'].format = '.2f'
+        efov_table['earth_solid_angle'].format = '.3e'
+        efov_table.write(outfile, format='ascii', delimiter='\t', overwrite=True)
 
 #----------------------------------------------------------------------
 #
