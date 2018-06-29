@@ -561,9 +561,9 @@ class ACISFPCheck(ACISThermalCheck):
         efov_table = Table([times, secs2date(times), e],
                            names=['time', 'date', 'earth_solid_angle'],
                            copy=False)
-        efov_table['time'].format = '.2f'
-        efov_table['earth_solid_angle'].format = '.3e'
-        efov_table.write(outfile, format='ascii', delimiter='\t', overwrite=True)
+        efov_table['time'].format = '%.2f'
+        efov_table['earth_solid_angle'].format = '%.3e'
+        efov_table.write(outfile, format='ascii', delimiter='\t')
 
 #----------------------------------------------------------------------
 #
