@@ -23,6 +23,7 @@ Load directory        {{bsdir}}
 Run time              {{proc.run_time}} by {{proc.run_user}}
 Run log               `<run.dat>`_
 Temperatures          `<temperatures.dat>`_
+Earth Solid Angles    `<earth_solid_angles.dat>`_
 States                `<states.dat>`_
 ====================  =============================================
 
@@ -90,7 +91,7 @@ No ECS Observation -118.7 deg C FP_TEMP Violations
 
 .. image:: {{plots.acisfp_3.filename}}
 .. image:: {{plots.pow_sim.filename}}
-.. image:: {{plots.roll.filename}}
+.. image:: {{plots.roll_taco.filename}}
 
 =========================
 FP_TEMP Model Validation
