@@ -282,6 +282,10 @@ class ObsidFindFilter():
  
         for eachstate in cmd_states:
 
+            # Make sure we skip maneuver obsids explicitly
+            if 50000 > eachstate.obsid >= 40000:
+                continue
+
             # is this the first WSPOW of the interval?
             if (eachstate.power_cmd == 'WSPOW00000' or eachstate.power_cmd == 'WSVIDALLDN') and \
                firstpow is None:
