@@ -61,6 +61,7 @@ def who_in_fp(simpos=80655):
     #  return the string indicating which instrument is in the Focal Plane
     return is_in_the_fp
 
+
 class ObsidFindFilter():
 
     def __init__(self):
@@ -249,15 +250,6 @@ class ObsidFindFilter():
         #
         # Some inits
         #
-        min_exptime = 30000.0
-
-        # Open the output file, and write out a header
-        if outfilespec != None:
-            outfile = open(outfilespec, 'w')
-            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD '
-                          'SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT '
-                          'CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL Q1 '
-                          'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
 
         # a little initialization
         firstpow = None
@@ -367,7 +359,7 @@ class ObsidFindFilter():
                                                  exptime,
                                                  science_instrument])
 
-                # now  clear out the data values
+                # now clear out the data values
                 firstpow = None
                 DOYfetchstart = ' '
                 obsid = None
@@ -380,10 +372,14 @@ class ObsidFindFilter():
         # End of LOOP for eachstate in cmd_states:
 
         # Write out the OBSID interval list and return it upon exit
-
-        if outfilespec != None:
+        if outfilespec is not None:
+            outfile = open(outfilespec, 'w')
+            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD '
+                          'SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT '
+                          'CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL Q1 '
+                          'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
             outfile.write("\n\n")
-            outfile.write(str(self.obsid_interval_list) )
+            outfile.write(str(self.obsid_interval_list))
             outfile.close()
 
         return self.obsid_interval_list
