@@ -1,4 +1,4 @@
-__version__ = "2.4.0"
+__version__ = "2.5.0"
 
 from .acisfp_check import \
     ACISFPCheck, calc_model
