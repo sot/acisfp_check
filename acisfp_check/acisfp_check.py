@@ -20,14 +20,11 @@ matplotlib.use('Agg')
 import glob
 from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
-import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime, secs2date
 from collections import defaultdict
 import numpy as np
-import xija
 from acis_thermal_check import \
     ACISThermalCheck, \
-    calc_off_nom_rolls, \
     get_options, \
     mylog, get_acis_limits
 from acis_thermal_check.utils import \
@@ -35,11 +32,10 @@ from acis_thermal_check.utils import \
 import os
 import sys
 from kadi import events
-import Ska.Numpy
 from astropy.table import Table
 
 #
-# Import ACIS-specific observation extraction, filtering 
+# Import ACIS-specific observation extraction, filtering
 # and attribute support routines.
 #
 from .acis_obs import ObsidFindFilter
@@ -47,111 +43,78 @@ from .acis_obs import ObsidFindFilter
 model_path = os.path.abspath(os.path.dirname(__file__))
 default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 
-#
-# INIT
-#
-VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
-                     'TSCPOS': [(1, 2.5), (99, 2.5)]
-                     }
-
-HIST_LIMIT = [(-120.0, -112.0)]
-
-def calc_model(model_spec, states, start, stop, T_acisfp=None,
-               T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
-    """
-    Create and run the Thermal Model for the Focal Plane temperature.
-
-    Given: Model name (some string)
-           Commanded States collected by make_week_predict
-           start time
-           Stop Time
-           T_acisfp
-           T_acisfp_times
-    """
-    # Start by creating the basic modeling framework for a XIJA Thermal Model
-    # Give it some name, start and stop time and the name of the JSON file
-    # --------------
-    # THERMAL_MODEL
-    # --------------
-    model = xija.ThermalModel('acisfp', start=start, stop=stop, model_spec=model_spec)
-
-    # create a numpy array of the start and stop times in the 
-    # commanded states array fetched by make_week_predict
-    times = np.array([states['tstart'], states['tstop']])
-
-    # Now set any data values for the components of your model
-    # What you have to push in manually are:
-    #       any states information like vid_board or ccd count
-    #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
-    #       any single value initializations you think ought to be made.
-    #         - e.g. fptemp in this case since it's what you are looking for.
-
-    # For each item in the Commanded States data structure which matters to us,
-    # insert the values in the commanded states data structure into the model:
-    # 
-    # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
-    # array have to be manually shoved in.
-    #
-    # pitch comes from the telemetry
-    model.comp['eclipse'].set_data(False)
-    model.comp['sim_z'].set_data(states['simpos'], times)
-    model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
-
-    if "roll" in model.comp:
-        model.comp['roll'].set_data(calc_off_nom_rolls(states), times)
-
-    for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
-        model.comp[name].set_data(states[name], times)
-
-    # model.comp Not in xija documentation
-    model.comp['dh_heater'].set_data(dh_heater, dh_heater_times)
-
-    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded
-    #  states  but they are in telemetry
-    # We have to manually insert the aoattqt<x> valued because some items 
-    # are sampled on 5 minute intervals and some are not.
-    for i in range(1, 5):
-        name = 'aoattqt{}'.format(i)
-        state_name = 'q{}'.format(i)
-        model.comp[name].set_data(states[state_name], times)
-
-    # Get ephemeris from eng archive
-    for axis in "xyz":
-        name = 'orbitephem0_{}'.format(axis)
-        msid = fetch.Msid(name, model.tstart - 2000, model.tstop + 2000)
-        model.comp[name].set_data(msid.vals, msid.times)
-
-    # Set some initial values. Some of these are superfluous. You do this because some
-    # of these values may not be set at the actual start time. The telemetry might not have
-    # reached that point
-    model.comp['dpa_power'].set_data(0.0)
-    model.comp['1cbat'].set_data(-53.0)
-    model.comp['sim_px'].set_data(-120.0)
-
-    # Create the model
-    model.make()
-    model.calc()
-
-    return model
-
 
 class ACISFPCheck(ACISThermalCheck):
-
-    def __init__(self, msid, name, validation_limits,
-                 hist_limit, calc_model, args, other_telem=None,
-                 other_map=None):
-        super(ACISFPCheck, self).__init__(msid, name, validation_limits,
-                                          hist_limit, calc_model, args, 
-                                          other_telem=other_telem, other_map=other_map)
+    def __init__(self, args):
+        valid_limits = {'PITCH': [(1, 3.0), (99, 3.0)],
+                        'TSCPOS': [(1, 2.5), (99, 2.5)]
+                        }
+        hist_limit = [(-120.0, -112.0)]
+        super(ACISFPCheck, self).__init__("fptemp", "acisfp", valid_limits,
+                                          hist_limit, args,
+                                          other_telem=['1dahtbon'],
+                                          other_map={'1dahtbon': 'dh_heater',
+                                                     "fptemp_11": "fptemp"})
         # Set specific limits for the focal plane model
-        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = get_acis_limits("fptemp")
+        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
+            get_acis_limits("fptemp")
         # Read in the FP Sensitive Nopref file and form nopref array from it.
         self.nopref_array = process_nopref_list(self.args.fps_nopref)
         # Create an empty observation list which will hold the results. This
-        # list contains all ACIS and all CTI observations and will have the 
+        # list contains all ACIS and all CTI observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
+
+    def _calc_model_supp(self, model, state_times, states, ephem_times, ephem,
+                         T_init):
+        """
+        Create and run the Thermal Model for the Focal Plane temperature.
+
+        Given: Model name (some string)
+               Commanded States collected by make_week_predict
+               start time
+               Stop Time
+               T_acisfp
+               T_acisfp_times
+        """
+        # Start by creating the basic modeling framework for a XIJA Thermal Model
+        # Give it some name, start and stop time and the name of the JSON file
+        # --------------
+        # THERMAL_MODEL
+        # --------------
+
+        # Now set any data values for the components of your model
+        # What you have to push in manually are:
+        #       any states information like vid_board or ccd count
+        #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
+        #       any single value initializations you think ought to be made.
+        #         - e.g. fptemp in this case since it's what you are looking for.
+
+        # For each item in the Commanded States data structure which matters to us,
+        # insert the values in the commanded states data structure into the model:
+        # 
+        # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
+        # array have to be manually shoved in.
+        #
+        # pitch comes from the telemetry
+
+        # Input quaternions explicitly for calculating Earth heating
+        for i in range(1, 5):
+            name = 'aoattqt{}'.format(i)
+            state_name = 'q{}'.format(i)
+            model.comp[name].set_data(states[state_name], state_times)
+
+        # Input ephemeris explicitly for calculating Earth heating
+        for axis in "xyz":
+            name = 'orbitephem0_{}'.format(axis)
+            model.comp[name].set_data(ephem[name], ephem_times)
+
+        # Set some initial values. You do this because some
+        # of these values may not be set at the actual start time.
+        model.comp['dpa_power'].set_data(0.0)
+        model.comp['1cbat'].set_data(-53.0)
+        model.comp['sim_px'].set_data(-120.0)
 
     def _gather_perigee(self, run_start, load_start):
         # The first step is to build a list of all the perigee passages.
@@ -236,8 +199,8 @@ class ACISFPCheck(ACISThermalCheck):
             fig_id=num_figs+2,
             title='Off-Nominal Roll and Earth Solid Angle in Rad FOV',
             xlabel='Date',
-            x=pointpair(states['tstart'], states['tstop']),
-            y=pointpair(calc_off_nom_rolls(states)),
+            x=self.predict_model.times,
+            y=self.predict_model.comp["roll"].dvals,
             xmin=plot_start,
             ylabel='Roll Angle (deg)',
             ylim=(-20.0, 20.0),
@@ -759,19 +722,16 @@ def main():
     opts = [("fps_nopref", {"default": default_nopref_list,
              "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
-    acisfp_check = ACISFPCheck("fptemp", "acisfp", VALIDATION_LIMITS, 
-                               HIST_LIMIT, calc_model, args,
-                               other_telem=['1dahtbon'],
-                               other_map={'1dahtbon': 'dh_heater',
-                                          "fptemp_11": "fptemp"})
+    acisfp_check = ACISFPCheck()
     try:
-        acisfp_check.run()
+        acisfp_check.run(args)
     except Exception as msg:
         if args.traceback:
             raise
         else:
             print("ERROR:", msg)
             sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
