@@ -45,26 +45,32 @@ default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 
 
 class ACISFPCheck(ACISThermalCheck):
-    def __init__(self, args):
+    def __init__(self):
         valid_limits = {'PITCH': [(1, 3.0), (99, 3.0)],
                         'TSCPOS': [(1, 2.5), (99, 2.5)]
                         }
         hist_limit = [(-120.0, -112.0)]
         super(ACISFPCheck, self).__init__("fptemp", "acisfp", valid_limits,
-                                          hist_limit, args,
+                                          hist_limit,
                                           other_telem=['1dahtbon'],
                                           other_map={'1dahtbon': 'dh_heater',
                                                      "fptemp_11": "fptemp"})
         # Set specific limits for the focal plane model
         self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
             get_acis_limits("fptemp")
+        self.nopref_array = None
+        self.obs_with_sensitivity = None
+        self.perigee_passages = None
+
+    def run(self, args):
         # Read in the FP Sensitive Nopref file and form nopref array from it.
-        self.nopref_array = process_nopref_list(self.args.fps_nopref)
+        self.nopref_array = process_nopref_list(args.fps_nopref)
         # Create an empty observation list which will hold the results. This
         # list contains all ACIS and all CTI observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
+        super(ACISFPCheck, self).run(args)
 
     def _calc_model_supp(self, model, state_times, states, ephem_times, ephem,
                          T_init):
@@ -171,7 +177,8 @@ class ACISFPCheck(ACISThermalCheck):
         crm_file.close()
 
     def _make_state_plots(self, plots, num_figs, w1, plot_start,
-                          outdir, states, load_start, figsize=(8.5, 4.0)):
+                          outdir, states, model, load_start, 
+                          figsize=(8.5, 4.0)):
         # Make a plot of ACIS CCDs and SIM-Z position
         plots['pow_sim'] = plot_two(
             fig_id=num_figs+1,
@@ -217,7 +224,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots['roll_taco']['fig'].savefig(outfile)
         plots['roll_taco']['filename'] = filename
 
-    def make_prediction_plots(self, outdir, states, times, temps, tstart):
+    def make_prediction_plots(self, outdir, states, model, times, temps, tstart):
         """
         Make output plots.
 
@@ -355,7 +362,8 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name]['filename'] = filename
 
         self._make_state_plots(plots, 3, w1, plot_start,
-                               outdir, states, load_start, figsize=(12, 6))
+                               outdir, states, model, load_start, 
+                               figsize=(12, 6))
 
         return plots
 
