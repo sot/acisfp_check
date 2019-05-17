@@ -224,7 +224,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots['roll_taco']['fig'].savefig(outfile)
         plots['roll_taco']['filename'] = filename
 
-    def make_prediction_plots(self, outdir, states, model, times, temps, tstart):
+    def make_prediction_plots(self, outdir, states, times, temps, tstart):
         """
         Make output plots.
 
@@ -325,8 +325,8 @@ class ACISFPCheck(ACISThermalCheck):
         for i in range(3):
             name = "%s_%d" % (self.name, i+1)
             plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
-                                   x2=pointpair(states['tstart'], states['tstop']),
-                                   y2=pointpair(states['pitch']),
+                                   x2=self.predict_model.times,
+                                   y2=self.predict_model.comp["pitch"].mvals,
                                    title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
@@ -362,7 +362,7 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name]['filename'] = filename
 
         self._make_state_plots(plots, 3, w1, plot_start,
-                               outdir, states, model, load_start, 
+                               outdir, states, load_start, 
                                figsize=(12, 6))
 
         return plots
