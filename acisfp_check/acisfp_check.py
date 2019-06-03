@@ -177,8 +177,7 @@ class ACISFPCheck(ACISThermalCheck):
         crm_file.close()
 
     def _make_state_plots(self, plots, num_figs, w1, plot_start,
-                          outdir, states, model, load_start, 
-                          figsize=(8.5, 4.0)):
+                          outdir, states, load_start, figsize=(12, 6)):
         # Make a plot of ACIS CCDs and SIM-Z position
         plots['pow_sim'] = plot_two(
             fig_id=num_figs+1,
@@ -224,7 +223,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots['roll_taco']['fig'].savefig(outfile)
         plots['roll_taco']['filename'] = filename
 
-    def make_prediction_plots(self, outdir, states, times, temps, tstart):
+    def make_prediction_plots(self, outdir, states, temps, tstart):
         """
         Make output plots.
 
@@ -238,6 +237,8 @@ class ACISFPCheck(ACISThermalCheck):
         This function assumes that ACIS Ops LR has been run and that the directory
         is populated with
         """
+
+        times = self.predict_model.times
 
         # Gather perigee passages
         self._gather_perigee(times[0], tstart)
@@ -331,7 +332,7 @@ class ACISFPCheck(ACISThermalCheck):
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
                                    ylim=ylim[i], ylim2=(40, 180),
-                                   figsize=(12, 6), width=w1, load_start=load_start)
+                                   width=w1, load_start=load_start)
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
             plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
@@ -367,7 +368,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         return plots
 
-    def make_prediction_viols(self, times, temps, load_start):
+    def make_prediction_viols(self, temps, load_start):
         """
         Find limit violations where predicted temperature is above the
         red minus margin.
@@ -399,6 +400,8 @@ class ACISFPCheck(ACISThermalCheck):
                  - cti_viols
 
         """
+        times = self.predict_model.times
+
         mylog.info('\nMAKE VIOLS Checking for limit violations in ' +
                    str(len(self.obs_with_sensitivity)) +
                    " total science observations")
@@ -535,6 +538,7 @@ class ACISFPCheck(ACISThermalCheck):
         efov_table['time'].format = '%.2f'
         efov_table['earth_solid_angle'].format = '%.3e'
         efov_table.write(outfile, format='ascii', delimiter='\t')
+
 
 #----------------------------------------------------------------------
 #
