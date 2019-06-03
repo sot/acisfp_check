@@ -185,7 +185,8 @@ class ACISFPCheck(ACISThermalCheck):
             xlabel='Date',
             x=pointpair(states['tstart'], states['tstop']),
             y=pointpair(states['ccd_count']),
-            ylabel='CCD_COUNT',
+            yy=pointpair(states['fep_count']),
+            ylabel='CCD/FEP Count',
             ylim=(-0.1, 6.1),
             xmin=plot_start,
             x2=pointpair(states['tstart'], states['tstop']),
@@ -537,7 +538,7 @@ class ACISFPCheck(ACISThermalCheck):
                            copy=False)
         efov_table['time'].format = '%.2f'
         efov_table['earth_solid_angle'].format = '%.3e'
-        efov_table.write(outfile, format='ascii', delimiter='\t')
+        efov_table.write(outfile, format='ascii', delimiter='\t', overwrite=True)
 
 
 #----------------------------------------------------------------------

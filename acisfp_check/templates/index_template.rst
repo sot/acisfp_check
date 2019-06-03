@@ -38,7 +38,7 @@ Date start             Date stop              Max temperature     Obsids
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No ACIS-I -114 deg C FP_TEMP Violations
+No ACIS-I -112 deg C FP_TEMP Violations
 {% endif %}
 
 
@@ -53,7 +53,7 @@ Date start             Date stop              Max temperature     Obsids
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No ACIS-S -112 deg C FP_TEMP Violations
+No ACIS-S -111 deg C FP_TEMP Violations
 {% endif %}
 
 
@@ -139,8 +139,7 @@ Red = telemetry, blue = model
 Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
 -----------------------------------------------------------------------
 
-.. image:: {{plot.histlog}}
-.. image:: {{plot.histlin}}
+.. image:: {{plot.hist}}
 
 {% endfor %}
 

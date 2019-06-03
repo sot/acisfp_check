@@ -69,7 +69,6 @@ Red = telemetry, blue = model
 Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
 -----------------------------------------------------------------------
 
-.. image:: {{plot.histlog}}
-.. image:: {{plot.histlin}}
+.. image:: {{plot.hist}}
 
 {% endfor %}
