@@ -28,7 +28,7 @@ States                `<states.dat>`_
 ====================  =============================================
 
 {% if viols.ACIS_I.fptemp %}
-ACIS-I FP_TEMP -114 deg C Violations
+ACIS-I FP_TEMP -112 deg C Violations
 ------------------------------------
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     Obsids
@@ -43,7 +43,7 @@ No ACIS-I -114 deg C FP_TEMP Violations
 
 
 {% if viols.ACIS_S.fptemp %}
-ACIS-S FP_TEMP -112 deg C Violations
+ACIS-S FP_TEMP -111 deg C Violations
 ------------------------------------
 =====================  =====================  ==================  ==================
 Date start             Date stop              Max temperature     Obsids
