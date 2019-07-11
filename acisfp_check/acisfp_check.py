@@ -43,6 +43,9 @@ from .acis_obs import ObsidFindFilter
 model_path = os.path.abspath(os.path.dirname(__file__))
 default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
 
+opts = [("fps_nopref", {"default": default_nopref_list,
+                        "help": "Full path to the FP sensitive nopref file"})]
+
 
 class ACISFPCheck(ACISThermalCheck):
     def __init__(self):
@@ -732,8 +735,6 @@ def process_nopref_list(filespec=default_nopref_list):
 
 
 def main():
-    opts = [("fps_nopref", {"default": default_nopref_list,
-             "help": "Full path to the FP sensitive nopref file"})]
     args = get_options("acisfp", model_path, opts=opts)
     acisfp_check = ACISFPCheck()
     try:
