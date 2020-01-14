@@ -1,4 +1,6 @@
-__version__ = "2.7.0"
+import ska_helpers
+
+__version__ = ska_helpers.get_version(__package__)
 
 from .acisfp_check import \
     ACISFPCheck, calc_model
