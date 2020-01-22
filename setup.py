@@ -8,7 +8,8 @@ url = 'https://github.com/acisops/acisfp_check/tarball/{}'.format(__version__)
 
 setup(name='acisfp_check',
       packages=["acisfp_check"],
-      version=__version__,
+      use_scm_version=True,
+      setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
       description='ACIS Thermal Model for FPTEMP',
       author='John ZuHone',
       author_email='jzuhone@gmail.com',
