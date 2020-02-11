@@ -75,8 +75,7 @@ class ACISFPCheck(ACISThermalCheck):
         self.perigee_passages = []
         super(ACISFPCheck, self).run(args)
 
-    def _calc_model_supp(self, model, state_times, states, ephem_times, ephem,
-                         T_init):
+    def _calc_model_supp(self, model, state_times, states, ephem, state0):
         """
         Create and run the Thermal Model for the Focal Plane temperature.
 
@@ -117,7 +116,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Input ephemeris explicitly for calculating Earth heating
         for axis in "xyz":
             name = 'orbitephem0_{}'.format(axis)
-            model.comp[name].set_data(ephem[name], ephem_times)
+            model.comp[name].set_data(ephem[name].vals, ephem[name].times)
 
         # Set some initial values. You do this because some
         # of these values may not be set at the actual start time.
