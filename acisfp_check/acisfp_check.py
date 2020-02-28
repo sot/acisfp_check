@@ -41,10 +41,6 @@ from astropy.table import Table
 from .acis_obs import ObsidFindFilter
 
 model_path = os.path.abspath(os.path.dirname(__file__))
-default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
-
-opts = [("fps_nopref", {"default": default_nopref_list,
-                        "help": "Full path to the FP sensitive nopref file"})]
 
 
 class ACISFPCheck(ACISThermalCheck):
@@ -61,13 +57,10 @@ class ACISFPCheck(ACISThermalCheck):
         # Set specific limits for the focal plane model
         self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
             get_acis_limits("fptemp")
-        self.nopref_array = None
         self.obs_with_sensitivity = None
         self.perigee_passages = None
 
     def run(self, args):
-        # Read in the FP Sensitive Nopref file and form nopref array from it.
-        self.nopref_array = process_nopref_list(args.fps_nopref)
         # Create an empty observation list which will hold the results. This
         # list contains all ACIS and all CTI observations and will have the
         # sensitivity boolean added.
@@ -354,7 +347,7 @@ class ACISFPCheck(ACISThermalCheck):
 
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
-            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
+            draw_obsids(extract_and_filter, self.obs_with_sensitivity, 
                         plots, name, ypos[i], ypos[i]-0.5*capwidth[i], ypos[i]+0.5*capwidth[i],
                         textypos[i], fontsize[i], plot_start)
 
@@ -429,16 +422,6 @@ class ACISFPCheck(ACISThermalCheck):
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
         fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
 
-        # Now if there is an Obsid in the FP Sense list that is ALSO in the
-        # No Pref list - remove that Obsid from the FP Sense list:
-        fp_sense_without_noprefs = []
-
-        nopref_list = self.nopref_array['obsid'].tolist()
-
-        for eachobs in fp_sens_only_obs:
-            if str(eandf.get_obsid(eachobs)) not in nopref_list:
-                fp_sense_without_noprefs.append(eachobs)
-
         temp = temps[self.name]
 
         # ------------------------------------
@@ -459,7 +442,7 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
         viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
-                                                        fp_sense_without_noprefs, 
+                                                        fp_sens_only_obs, 
                                                         temp, times, load_start)
         # --------------------------------------------------------------
         #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
@@ -567,7 +550,7 @@ def paint_perigee(perigee_passages, states, plots, msid):
     # Now plot any perigee passages that occur between xmin and xmax
     for eachpassage in perigee_passages:
         # The index [1] item is always the Perigee Passage time. Draw that line in red
-        # If this line is between tstart and tstop then it needs to be drawn 
+        # If this line is between tstart and tstop then it needs to be drawn
         # on the plot. otherwise ignore
         if states['tstop'][-1] >= DateTime(eachpassage[0]).secs >= states['tstart'][0]:
             # Have to convert this time into the new x axis time scale necessitated by SKA
@@ -587,7 +570,6 @@ def paint_perigee(perigee_passages, states, plots, msid):
 
 def draw_obsids(extract_and_filter, 
                 obs_with_sensitivity, 
-                nopref_array,
                 plots,
                 msid, 
                 ypos, 
@@ -609,7 +591,6 @@ def draw_obsids(extract_and_filter,
     The caller supplies:
                Options from the Command line supplied by the user at runtime
                The instance of the ObsidFindFilter() class created 
-               nopref rec array
                The plot dictionary
                The MSID used to index into the plot dictinary (superfluous but required)
                The position on the Y axis you'd like these indicators to appear
@@ -637,17 +618,7 @@ def draw_obsids(extract_and_filter,
         #
         # If the observation is FP sensitive in the first place............
         if eachobservation[extract_and_filter.is_fp_sensitive]:
-            # extract the obsid for convenience
-            this_obsid = extract_and_filter.get_obsid(eachobservation)
-
-            # But if it's also in the nopref list AND the upcased CandS_status entry is "NO PREF"
-            where_words = np.where(nopref_array['obsid'] == str(this_obsid))
-            if str(this_obsid) in nopref_array['obsid'] and \
-               nopref_array['CandS_status'][where_words[0][0]].upper()[:7] == 'NO_PREF':
-                color = 'purple'
-                obsid = obsid + ' * NO PREF *'
-            else:
-                obsid = obsid + ' * FP SENS *'
+            obsid = obsid + ' * FP SENS *'
 
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
@@ -691,50 +662,8 @@ def draw_obsids(extract_and_filter,
                                        fontsize = fontsize)
 
 
-#------------------------------------------------------------------------------
-#
-#   process_nopref_list - read and store the list of observations which
-#                         prefer a Cold and Stable focal plane, but
-#                         which have had that desire waived.
-#
-#                          Input:  nopref file specification
-#                         Output:  nopref_array (numpy array)
-#
-#------------------------------------------------------------------------------
-def process_nopref_list(filespec=default_nopref_list):
-    # Create the dtype for the nopref list rec array
-    nopref_dtype = [('obsid', '|S10'), ('Seq_no', '|S10'), 
-                    ('prop', '|S10'), ('CandS_status', '|S15')]
-
-    # Create an empty nopref array
-    nopref_array = np.array([], dtype=nopref_dtype)
-
-    # Open the nopref list file
-    nopreflist = open(filespec, "r")
-
-    # For each line in the file......
-    for line in nopreflist.readlines():
-
-        # split the line out into it's constituent parts
-        splitline = line.encode().split()
-
-        # If the line is NOT a comment (i.e. does not start with a "#")
-        if splitline[0][0] != '#':
-
-            # Create the row
-            one_entry = np.array(splitline, dtype=nopref_dtype)
-            # Append this row onto the array
-            nopref_array = np.append(nopref_array, one_entry, axis=0)
-
-    # Done with the nopref list file
-    nopreflist.close()
-
-    # Now return the nopref array
-    return nopref_array 
-
-
 def main():
-    args = get_options("acisfp", model_path, opts=opts)
+    args = get_options("acisfp", model_path)
     acisfp_check = ACISFPCheck()
     try:
         acisfp_check.run(args)
