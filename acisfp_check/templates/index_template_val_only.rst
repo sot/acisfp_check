@@ -58,11 +58,25 @@ No Validation Violations
 {% endif %}
    
 {% for plot in plots_validation %}
+
+{% if plot.msid == "ccd_count" %}
+
+CCD/FEP Count
+-------------
+
+.. image:: {{plot.lines}}
+
+{% elif plot.msid == "earthheat__fptemp" %}
+
+Earth Solid Angle
+-----------------
+
+.. image:: {{plot.lines}}
+
+{% else %}
+
 {{ plot.msid }}
 -----------------------
-
-
-Red = telemetry, blue = model
 
 .. image:: {{plot.lines}}
 
@@ -70,5 +84,7 @@ Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
 -----------------------------------------------------------------------
 
 .. image:: {{plot.hist}}
+
+{% endif %}
 
 {% endfor %}

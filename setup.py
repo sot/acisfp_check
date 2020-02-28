@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 from setuptools import setup
 
+try:
+    from testr.setup_helper import cmdclass
+except ImportError:
+    cmdclass = {}
+
 entry_points = {'console_scripts': 'acisfp_check = acisfp_check.acisfp_check:main'}
 
 setup(name='acisfp_check',
@@ -13,4 +18,7 @@ setup(name='acisfp_check',
       url='http://github.com/acisops/acisfp_check',
       include_package_data=True,
       entry_points=entry_points,
+      zip_safe=False,
+      tests_require=["pytest"],
+      cmdclass=cmdclass,
       )
