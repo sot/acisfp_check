@@ -60,13 +60,29 @@ class ACISFPCheck(ACISThermalCheck):
         self.obs_with_sensitivity = None
         self.perigee_passages = None
 
-    def run(self, args):
+    def run(self, args, override_limits=None):
+        """
+        The main interface to all of ACISThermalCheck's functions.
+        This method must be called by the particular thermal model
+        implementation to actually run the code and make the webpage.
+
+        Parameters
+        ----------
+        args : ArgumentParser arguments
+            The command-line options object, which has the options
+            attached to it as attributes
+        override_limits : dict, optional
+            Override any margin by setting a new value to its name
+            in this dictionary. SHOULD ONLY BE USED FOR TESTING.
+            This is deliberately hidden from command-line operation
+            to avoid it being used accidentally.
+        """
         # Create an empty observation list which will hold the results. This
         # list contains all ACIS and all CTI observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
-        super(ACISFPCheck, self).run(args)
+        super(ACISFPCheck, self).run(args, override_limits=override_limits)
 
     def _calc_model_supp(self, model, state_times, states, ephem, state0):
         """
