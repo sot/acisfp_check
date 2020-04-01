@@ -205,6 +205,9 @@ class ACISFPCheck(ACISThermalCheck):
             ylabel2='SIM-Z (steps)',
             ylim2=(-105000, 105000),
             figsize=figsize, width=w1, load_start=load_start)
+        plots['pow_sim']['ax'].lines[0].set_label('CCDs')
+        plots['pow_sim']['ax'].lines[1].set_label('FEPs')
+        plots['pow_sim']['ax'].legend(fancybox=True, framealpha=0.5, loc=2)
         paint_perigee(self.perigee_passages, states, plots, "pow_sim")
         filename = 'pow_sim.png'
         outfile = os.path.join(outdir, filename)
