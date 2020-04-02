@@ -125,7 +125,7 @@ class ACISFPCheck(ACISThermalCheck):
         # Input ephemeris explicitly for calculating Earth heating
         for axis in "xyz":
             name = 'orbitephem0_{}'.format(axis)
-            model.comp[name].set_data(ephem[name].vals, ephem[name].times)
+            model.comp[name].set_data(ephem[name], model.times)
 
         # Set some initial values. You do this because some
         # of these values may not be set at the actual start time.
