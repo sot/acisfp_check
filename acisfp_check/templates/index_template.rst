@@ -9,6 +9,8 @@ Processing Errors
 .. class:: red
 {% endif %}
 
+{% if bsdir %}
+
 Summary
 --------         
 .. class:: borderless
@@ -93,6 +95,10 @@ No ECS Observation -118.7 deg C FP_TEMP Violations
 .. image:: {{plots.pow_sim.filename}}
 .. image:: {{plots.roll_taco.filename}}
 
+{% endif %}
+
+{% if not pred_only %}
+
 =========================
 FP_TEMP Model Validation
 =========================
@@ -162,6 +168,10 @@ Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
 
 {% endfor %}
 
+{% endif %}
+
+{% if bsdir %}
+
 ADDITIONAL PLOTS
 -----------------------
 
@@ -169,3 +179,5 @@ Additional plots of FPTEMP vs TIME for different temerature ranges
 
 .. image:: fptempM120toM119.png
 .. image:: fptempM120toM90.png
+
+{% endif %}
