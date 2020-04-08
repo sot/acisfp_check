@@ -451,24 +451,24 @@ class ObsidFindFilter():
                      an OBSID greater than 50k).
                    - return the filtered list
                      specified and return those intervals as a list.
-     
+
                 input: OBSIDIntervals - Interval list to be searched
-     
+
                output: A list of all intervals whose OBSIDs are less 
                        than 50k
-                       
+
                The program loops through the obsid intervals on the list 
                and if the value of the OBSID is less than 50k it appends
                that obsid interval to the output list
-     
+
                 usage: start_time = '2010:001'
                        stop_time  = '2010:014' 
                        filespec = <some file path> or " "
                        cmd_states = cmd_statesFetch(start_time, stop_time)
                        obsid_intervals = FindObsidIntervals(cmd_states, filespec)
-     
+
                        Non_cti_intervals = CTIFilter(OBSIDIntervals)
-                      
+
         """
         self.non_CTI_obs = []
 

@@ -73,24 +73,6 @@ Date start             Date stop              Max temperature     OBSID
 No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Preferences Unmet
 {% endif %}
 
-
-
-{% if viols.cti.fptemp %}
-FP_TEMP -118.7 deg C Violations for Perigee Passages
--------------------------------------------------------------------
-=====================  =====================  ==================
-Date start             Date stop              Max temperature
-=====================  =====================  ==================
-{% for viol in viols.cti.fptemp %}
-{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}
-{% endfor %}
-=====================  =====================  ==================
-{% else %}
-No ECS Observation -118.7 deg C FP_TEMP Violations
-{% endif %}
-
-
-
 .. image:: {{plots.acisfp_3.filename}}
 .. image:: {{plots.pow_sim.filename}}
 .. image:: {{plots.roll_taco.filename}}

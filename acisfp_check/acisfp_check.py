@@ -429,8 +429,6 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------
         #   Create subsets of all the observations
         # ------------------------------------------------------
-        # Just the CTI runs
-        cti_only_obs = eandf.cti_only_filter(self.obs_with_sensitivity)
         # Now divide out observations by ACIS-S and ACIS-I
         ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
         ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
@@ -442,17 +440,6 @@ class ACISFPCheck(ACISThermalCheck):
         fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
 
         temp = temps[self.name]
-
-        # ------------------------------------
-        #  CTI-ONLY, -118.7 violation check
-        # ------------------------------------
-        mylog.info('\n\nFP SENSITIVE -118.7 CTI ONLY violations')
-        # Collect any -118.7C violations of CTI runs. These are not
-        # load killers but need to be reported
-
-        viols["cti"] = self.search_obsids_for_viols("CTI", self.fp_sens_limit, 
-                                                    cti_only_obs, temp, times, 
-                                                    load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -598,7 +585,7 @@ def draw_obsids(extract_and_filter,
                 fontsize,
                 plot_start):
     """
-    This functiion draws visual indicators across the top of the plot showing
+    This function draws visual indicators across the top of the plot showing
     which observations are ACIS; whether they are ACIS-I (red) or ACIS-S (green)
     when they start and stop, and whether or not any observation is sensitive to the
     focal plane temperature.  The list of observations sensitive to the focal plane
@@ -611,7 +598,7 @@ def draw_obsids(extract_and_filter,
                Options from the Command line supplied by the user at runtime
                The instance of the ObsidFindFilter() class created 
                The plot dictionary
-               The MSID used to index into the plot dictinary (superfluous but required)
+               The MSID used to index into the plot dictionary (superfluous but required)
                The position on the Y axis you'd like these indicators to appear
                The Y position of the bottom of the end caps
                The Y position of the top of the end caps
