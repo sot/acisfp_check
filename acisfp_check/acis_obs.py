@@ -275,7 +275,7 @@ class ObsidFindFilter():
         for eachstate in cmd_states:
 
             # Make sure we skip maneuver obsids explicitly
-            if 50000 > eachstate.obsid >= 40000:
+            if 50000 > eachstate.obsid >= 38001:
                 continue
 
             # is this the first WSPOW of the interval?
