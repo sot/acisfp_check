@@ -1,4 +1,3 @@
-from __future__ import print_function
 ###############################################################################
 #
 #   ObsidFindFilter - Class that will extract CHANDRA ACIS OBSIDs using
@@ -17,7 +16,7 @@ from __future__ import print_function
 #
 ###############################################################################
 from Chandra.Time import DateTime
-import Ska.engarchive.fetch_sci as fetch
+import cheta.fetch_sci as fetch
 from Ska.DBI import DBI
 
 #----------------------------------------------------------------

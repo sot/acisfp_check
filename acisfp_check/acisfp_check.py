@@ -10,7 +10,6 @@ focal plane temperature: FP_TEMP11. It also generates FP_TEMP11 model
 validation plots comparing predicted values to telemetry for the 
 previous three weeks.
 """
-from __future__ import print_function
 
 # Matplotlib setup
 # Use Agg backend for command-line (non-interactive) operation
