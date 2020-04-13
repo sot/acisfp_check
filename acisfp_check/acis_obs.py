@@ -1,4 +1,3 @@
-from __future__ import print_function
 ###############################################################################
 #
 #   ObsidFindFilter - Class that will extract CHANDRA ACIS OBSIDs using
@@ -17,7 +16,7 @@ from __future__ import print_function
 #
 ###############################################################################
 from Chandra.Time import DateTime
-import Ska.engarchive.fetch_sci as fetch
+import cheta.fetch_sci as fetch
 from Ska.DBI import DBI
 
 #----------------------------------------------------------------
@@ -60,6 +59,7 @@ def who_in_fp(simpos=80655):
 
     #  return the string indicating which instrument is in the Focal Plane
     return is_in_the_fp
+
 
 class ObsidFindFilter():
 
@@ -249,15 +249,6 @@ class ObsidFindFilter():
         #
         # Some inits
         #
-        min_exptime = 30000.0
-
-        # Open the output file, and write out a header
-        if outfilespec != None:
-            outfile = open(outfilespec, 'w')
-            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD '
-                          'SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT '
-                          'CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL Q1 '
-                          'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
 
         # a little initialization
         firstpow = None
@@ -281,6 +272,10 @@ class ObsidFindFilter():
         #This constitutes one observation.
  
         for eachstate in cmd_states:
+
+            # Make sure we skip maneuver obsids explicitly
+            if 50000 > eachstate.obsid >= 38001:
+                continue
 
             # is this the first WSPOW of the interval?
             if (eachstate.power_cmd == 'WSPOW00000' or eachstate.power_cmd == 'WSVIDALLDN') and \
@@ -363,7 +358,7 @@ class ObsidFindFilter():
                                                  exptime,
                                                  science_instrument])
 
-                # now  clear out the data values
+                # now clear out the data values
                 firstpow = None
                 DOYfetchstart = ' '
                 obsid = None
@@ -376,10 +371,14 @@ class ObsidFindFilter():
         # End of LOOP for eachstate in cmd_states:
 
         # Write out the OBSID interval list and return it upon exit
-
-        if outfilespec != None:
+        if outfilespec is not None:
+            outfile = open(outfilespec, 'w')
+            outfile.write('DOYstart DOYstop TSTART TSTOP OBSID PWR_CMD '
+                          'SI_MODE PCAD_MODE VID_BOARD CLOCKING FEP_COUNT '
+                          'CCD_CNT SIMPOS SIMFA_POS PITCH RA DEC ROLL Q1 '
+                          'Q2 Q3 Q4 TRANS-KEYS HETG LETG Dither EXPTIME')
             outfile.write("\n\n")
-            outfile.write(str(self.obsid_interval_list) )
+            outfile.write(str(self.obsid_interval_list))
             outfile.close()
 
         return self.obsid_interval_list
@@ -451,24 +450,24 @@ class ObsidFindFilter():
                      an OBSID greater than 50k).
                    - return the filtered list
                      specified and return those intervals as a list.
-     
+
                 input: OBSIDIntervals - Interval list to be searched
-     
+
                output: A list of all intervals whose OBSIDs are less 
                        than 50k
-                       
+
                The program loops through the obsid intervals on the list 
                and if the value of the OBSID is less than 50k it appends
                that obsid interval to the output list
-     
+
                 usage: start_time = '2010:001'
                        stop_time  = '2010:014' 
                        filespec = <some file path> or " "
                        cmd_states = cmd_statesFetch(start_time, stop_time)
                        obsid_intervals = FindObsidIntervals(cmd_states, filespec)
-     
+
                        Non_cti_intervals = CTIFilter(OBSIDIntervals)
-                      
+
         """
         self.non_CTI_obs = []
 

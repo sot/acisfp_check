@@ -9,6 +9,8 @@ Processing Errors
 .. class:: red
 {% endif %}
 
+{% if bsdir %}
+
 Summary
 --------         
 .. class:: borderless
@@ -38,7 +40,7 @@ Date start             Date stop              Max temperature     Obsids
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No ACIS-I -114 deg C FP_TEMP Violations
+No ACIS-I -112 deg C FP_TEMP Violations
 {% endif %}
 
 
@@ -53,7 +55,7 @@ Date start             Date stop              Max temperature     Obsids
 {% endfor %}
 =====================  =====================  ==================  ==================
 {% else %}
-No ACIS-S -112 deg C FP_TEMP Violations
+No ACIS-S -111 deg C FP_TEMP Violations
 {% endif %}
 
 
@@ -71,27 +73,13 @@ Date start             Date stop              Max temperature     OBSID
 No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Preferences Unmet
 {% endif %}
 
-
-
-{% if viols.cti.fptemp %}
-FP_TEMP -118.7 deg C Violations for Perigee Passages
--------------------------------------------------------------------
-=====================  =====================  ==================
-Date start             Date stop              Max temperature
-=====================  =====================  ==================
-{% for viol in viols.cti.fptemp %}
-{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}
-{% endfor %}
-=====================  =====================  ==================
-{% else %}
-No ECS Observation -118.7 deg C FP_TEMP Violations
-{% endif %}
-
-
-
 .. image:: {{plots.acisfp_3.filename}}
 .. image:: {{plots.pow_sim.filename}}
 .. image:: {{plots.roll_taco.filename}}
+
+{% endif %}
+
+{% if not pred_only %}
 
 =========================
 FP_TEMP Model Validation
@@ -128,6 +116,23 @@ No Validation Violations
 {% endif %}
 
 {% for plot in plots_validation %}
+
+{% if plot.msid == "ccd_count" %}
+
+CCD/FEP Count
+-------------
+
+.. image:: {{plot.lines}}
+
+{% elif plot.msid == "earthheat__fptemp" %}
+
+Earth Solid Angle
+-----------------
+
+.. image:: {{plot.lines}}
+
+{% else %}
+
 {{ plot.msid }}
 -----------------------
 
@@ -139,10 +144,15 @@ Red = telemetry, blue = model
 Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
 -----------------------------------------------------------------------
 
-.. image:: {{plot.histlog}}
-.. image:: {{plot.histlin}}
+.. image:: {{plot.hist}}
+
+{% endif %}
 
 {% endfor %}
+
+{% endif %}
+
+{% if bsdir %}
 
 ADDITIONAL PLOTS
 -----------------------
@@ -151,3 +161,5 @@ Additional plots of FPTEMP vs TIME for different temerature ranges
 
 .. image:: fptempM120toM119.png
 .. image:: fptempM120toM90.png
+
+{% endif %}

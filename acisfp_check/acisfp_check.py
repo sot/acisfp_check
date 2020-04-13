@@ -10,7 +10,6 @@ focal plane temperature: FP_TEMP11. It also generates FP_TEMP11 model
 validation plots comparing predicted values to telemetry for the 
 previous three weeks.
 """
-from __future__ import print_function
 
 # Matplotlib setup
 # Use Agg backend for command-line (non-interactive) operation
@@ -20,14 +19,11 @@ matplotlib.use('Agg')
 import glob
 from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
-import Ska.engarchive.fetch_sci as fetch
 from Chandra.Time import DateTime, secs2date
 from collections import defaultdict
 import numpy as np
-import xija
 from acis_thermal_check import \
     ACISThermalCheck, \
-    calc_off_nom_rolls, \
     get_options, \
     mylog, get_acis_limits
 from acis_thermal_check.utils import \
@@ -35,123 +31,106 @@ from acis_thermal_check.utils import \
 import os
 import sys
 from kadi import events
-import Ska.Numpy
 from astropy.table import Table
 
 #
-# Import ACIS-specific observation extraction, filtering 
+# Import ACIS-specific observation extraction, filtering
 # and attribute support routines.
 #
 from .acis_obs import ObsidFindFilter
 
 model_path = os.path.abspath(os.path.dirname(__file__))
-default_nopref_list = os.path.join(model_path, "FPS_NoPref.txt")
-
-#
-# INIT
-#
-VALIDATION_LIMITS = {'PITCH': [(1, 3.0), (99, 3.0)],
-                     'TSCPOS': [(1, 2.5), (99, 2.5)]
-                     }
-
-HIST_LIMIT = [(-120.0, -112.0)]
-
-def calc_model(model_spec, states, start, stop, T_acisfp=None,
-               T_acisfp_times=None, dh_heater=None, dh_heater_times=None):
-    """
-    Create and run the Thermal Model for the Focal Plane temperature.
-
-    Given: Model name (some string)
-           Commanded States collected by make_week_predict
-           start time
-           Stop Time
-           T_acisfp
-           T_acisfp_times
-    """
-    # Start by creating the basic modeling framework for a XIJA Thermal Model
-    # Give it some name, start and stop time and the name of the JSON file
-    # --------------
-    # THERMAL_MODEL
-    # --------------
-    model = xija.ThermalModel('acisfp', start=start, stop=stop, model_spec=model_spec)
-
-    # create a numpy array of the start and stop times in the 
-    # commanded states array fetched by make_week_predict
-    times = np.array([states['tstart'], states['tstop']])
-
-    # Now set any data values for the components of your model
-    # What you have to push in manually are:
-    #       any states information like vid_board or ccd count
-    #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
-    #       any single value initializations you think ought to be made.
-    #         - e.g. fptemp in this case since it's what you are looking for.
-
-    # For each item in the Commanded States data structure which matters to us,
-    # insert the values in the commanded states data structure into the model:
-    # 
-    # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
-    # array have to be manually shoved in.
-    #
-    # pitch comes from the telemetry
-    model.comp['eclipse'].set_data(False)
-    model.comp['sim_z'].set_data(states['simpos'], times)
-    model.comp['fptemp'].set_data(T_acisfp, T_acisfp_times)
-
-    if "roll" in model.comp:
-        model.comp['roll'].set_data(calc_off_nom_rolls(states), times)
-
-    for name in ('ccd_count', 'fep_count', 'vid_board', 'clocking', 'pitch'):
-        model.comp[name].set_data(states[name], times)
-
-    # model.comp Not in xija documentation
-    model.comp['dh_heater'].set_data(dh_heater, dh_heater_times)
-
-    #  "orbitephem0_x","orbitephem0_y","orbitephem0_z" are not in Commanded
-    #  states  but they are in telemetry
-    # We have to manually insert the aoattqt<x> valued because some items 
-    # are sampled on 5 minute intervals and some are not.
-    for i in range(1, 5):
-        name = 'aoattqt{}'.format(i)
-        state_name = 'q{}'.format(i)
-        model.comp[name].set_data(states[state_name], times)
-
-    # Get ephemeris from eng archive
-    for axis in "xyz":
-        name = 'orbitephem0_{}'.format(axis)
-        msid = fetch.Msid(name, model.tstart - 2000, model.tstop + 2000)
-        model.comp[name].set_data(msid.vals, msid.times)
-
-    # Set some initial values. Some of these are superfluous. You do this because some
-    # of these values may not be set at the actual start time. The telemetry might not have
-    # reached that point
-    model.comp['dpa_power'].set_data(0.0)
-    model.comp['1cbat'].set_data(-53.0)
-    model.comp['sim_px'].set_data(-120.0)
-
-    # Create the model
-    model.make()
-    model.calc()
-
-    return model
 
 
 class ACISFPCheck(ACISThermalCheck):
-
-    def __init__(self, msid, name, validation_limits,
-                 hist_limit, calc_model, args, other_telem=None,
-                 other_map=None):
-        super(ACISFPCheck, self).__init__(msid, name, validation_limits,
-                                          hist_limit, calc_model, args, 
-                                          other_telem=other_telem, other_map=other_map)
+    def __init__(self):
+        valid_limits = {'PITCH': [(1, 3.0), (99, 3.0)],
+                        'TSCPOS': [(1, 2.5), (99, 2.5)]
+                        }
+        hist_limit = [(-120.0, -112.0)]
+        super(ACISFPCheck, self).__init__("fptemp", "acisfp", valid_limits,
+                                          hist_limit,
+                                          other_telem=['1dahtbon'],
+                                          other_map={'1dahtbon': 'dh_heater',
+                                                     "fptemp_11": "fptemp"})
         # Set specific limits for the focal plane model
-        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = get_acis_limits("fptemp")
-        # Read in the FP Sensitive Nopref file and form nopref array from it.
-        self.nopref_array = process_nopref_list(self.args.fps_nopref)
+        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
+            get_acis_limits("fptemp")
+        self.obs_with_sensitivity = None
+        self.perigee_passages = None
+
+    def run(self, args, override_limits=None):
+        """
+        The main interface to all of ACISThermalCheck's functions.
+        This method must be called by the particular thermal model
+        implementation to actually run the code and make the webpage.
+
+        Parameters
+        ----------
+        args : ArgumentParser arguments
+            The command-line options object, which has the options
+            attached to it as attributes
+        override_limits : dict, optional
+            Override any margin by setting a new value to its name
+            in this dictionary. SHOULD ONLY BE USED FOR TESTING.
+            This is deliberately hidden from command-line operation
+            to avoid it being used accidentally.
+        """
         # Create an empty observation list which will hold the results. This
-        # list contains all ACIS and all CTI observations and will have the 
+        # list contains all ACIS and all CTI observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
+        super(ACISFPCheck, self).run(args, override_limits=override_limits)
+
+    def _calc_model_supp(self, model, state_times, states, ephem, state0):
+        """
+        Create and run the Thermal Model for the Focal Plane temperature.
+
+        Given: Model name (some string)
+               Commanded States collected by make_week_predict
+               start time
+               Stop Time
+               T_acisfp
+               T_acisfp_times
+        """
+        # Start by creating the basic modeling framework for a XIJA Thermal Model
+        # Give it some name, start and stop time and the name of the JSON file
+        # --------------
+        # THERMAL_MODEL
+        # --------------
+
+        # Now set any data values for the components of your model
+        # What you have to push in manually are:
+        #       any states information like vid_board or ccd count
+        #       any pseudo-MSID's such as 1cbat (because the node does not reflect the MSID)
+        #       any single value initializations you think ought to be made.
+        #         - e.g. fptemp in this case since it's what you are looking for.
+
+        # For each item in the Commanded States data structure which matters to us,
+        # insert the values in the commanded states data structure into the model:
+        # 
+        # Telemetry doesn't have to be pushed in - the model handles that.But items in the states
+        # array have to be manually shoved in.
+        #
+        # pitch comes from the telemetry
+
+        # Input quaternions explicitly for calculating Earth heating
+        for i in range(1, 5):
+            name = 'aoattqt{}'.format(i)
+            state_name = 'q{}'.format(i)
+            model.comp[name].set_data(states[state_name], state_times)
+
+        # Input ephemeris explicitly for calculating Earth heating
+        for axis in "xyz":
+            name = 'orbitephem0_{}'.format(axis)
+            model.comp[name].set_data(ephem[name], model.times)
+
+        # Set some initial values. You do this because some
+        # of these values may not be set at the actual start time.
+        model.comp['dpa_power'].set_data(0.0)
+        model.comp['1cbat'].set_data(-53.0)
+        model.comp['sim_px'].set_data(-120.0)
 
     def _gather_perigee(self, run_start, load_start):
         # The first step is to build a list of all the perigee passages.
@@ -208,7 +187,7 @@ class ACISFPCheck(ACISThermalCheck):
         crm_file.close()
 
     def _make_state_plots(self, plots, num_figs, w1, plot_start,
-                          outdir, states, load_start, figsize=(8.5, 4.0)):
+                          outdir, states, load_start, figsize=(12, 6)):
         # Make a plot of ACIS CCDs and SIM-Z position
         plots['pow_sim'] = plot_two(
             fig_id=num_figs+1,
@@ -216,7 +195,8 @@ class ACISFPCheck(ACISThermalCheck):
             xlabel='Date',
             x=pointpair(states['tstart'], states['tstop']),
             y=pointpair(states['ccd_count']),
-            ylabel='CCD_COUNT',
+            yy=pointpair(states['fep_count']),
+            ylabel='CCD/FEP Count',
             ylim=(-0.1, 6.1),
             xmin=plot_start,
             x2=pointpair(states['tstart'], states['tstop']),
@@ -224,6 +204,9 @@ class ACISFPCheck(ACISThermalCheck):
             ylabel2='SIM-Z (steps)',
             ylim2=(-105000, 105000),
             figsize=figsize, width=w1, load_start=load_start)
+        plots['pow_sim']['ax'].lines[0].set_label('CCDs')
+        plots['pow_sim']['ax'].lines[1].set_label('FEPs')
+        plots['pow_sim']['ax'].legend(fancybox=True, framealpha=0.5, loc=2)
         paint_perigee(self.perigee_passages, states, plots, "pow_sim")
         filename = 'pow_sim.png'
         outfile = os.path.join(outdir, filename)
@@ -236,8 +219,8 @@ class ACISFPCheck(ACISThermalCheck):
             fig_id=num_figs+2,
             title='Off-Nominal Roll and Earth Solid Angle in Rad FOV',
             xlabel='Date',
-            x=pointpair(states['tstart'], states['tstop']),
-            y=pointpair(calc_off_nom_rolls(states)),
+            x=self.predict_model.times,
+            y=self.predict_model.comp["roll"].dvals,
             xmin=plot_start,
             ylabel='Roll Angle (deg)',
             ylim=(-20.0, 20.0),
@@ -254,7 +237,7 @@ class ACISFPCheck(ACISThermalCheck):
         plots['roll_taco']['fig'].savefig(outfile)
         plots['roll_taco']['filename'] = filename
 
-    def make_prediction_plots(self, outdir, states, times, temps, tstart):
+    def make_prediction_plots(self, outdir, states, temps, tstart):
         """
         Make output plots.
 
@@ -268,6 +251,8 @@ class ACISFPCheck(ACISThermalCheck):
         This function assumes that ACIS Ops LR has been run and that the directory
         is populated with
         """
+
+        times = self.predict_model.times
 
         # Gather perigee passages
         self._gather_perigee(times[0], tstart)
@@ -355,13 +340,13 @@ class ACISFPCheck(ACISThermalCheck):
         for i in range(3):
             name = "%s_%d" % (self.name, i+1)
             plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
-                                   x2=pointpair(states['tstart'], states['tstop']),
-                                   y2=pointpair(states['pitch']),
+                                   x2=self.predict_model.times,
+                                   y2=self.predict_model.comp["pitch"].mvals,
                                    title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
                                    ylim=ylim[i], ylim2=(40, 180),
-                                   figsize=(12, 6), width=w1, load_start=load_start)
+                                   width=w1, load_start=load_start)
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
             plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
@@ -380,7 +365,7 @@ class ACISFPCheck(ACISThermalCheck):
 
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
-            draw_obsids(extract_and_filter, self.obs_with_sensitivity, self.nopref_array,
+            draw_obsids(extract_and_filter, self.obs_with_sensitivity, 
                         plots, name, ypos[i], ypos[i]-0.5*capwidth[i], ypos[i]+0.5*capwidth[i],
                         textypos[i], fontsize[i], plot_start)
 
@@ -392,11 +377,12 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name]['filename'] = filename
 
         self._make_state_plots(plots, 3, w1, plot_start,
-                               outdir, states, load_start, figsize=(12, 6))
+                               outdir, states, load_start, 
+                               figsize=(12, 6))
 
         return plots
 
-    def make_prediction_viols(self, times, temps, load_start):
+    def make_prediction_viols(self, temps, load_start):
         """
         Find limit violations where predicted temperature is above the
         red minus margin.
@@ -428,6 +414,8 @@ class ACISFPCheck(ACISThermalCheck):
                  - cti_viols
 
         """
+        times = self.predict_model.times
+
         mylog.info('\nMAKE VIOLS Checking for limit violations in ' +
                    str(len(self.obs_with_sensitivity)) +
                    " total science observations")
@@ -440,8 +428,6 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------
         #   Create subsets of all the observations
         # ------------------------------------------------------
-        # Just the CTI runs
-        cti_only_obs = eandf.cti_only_filter(self.obs_with_sensitivity)
         # Now divide out observations by ACIS-S and ACIS-I
         ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
         ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
@@ -452,28 +438,7 @@ class ACISFPCheck(ACISThermalCheck):
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
         fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
 
-        # Now if there is an Obsid in the FP Sense list that is ALSO in the
-        # No Pref list - remove that Obsid from the FP Sense list:
-        fp_sense_without_noprefs = []
-
-        nopref_list = self.nopref_array['obsid'].tolist()
-
-        for eachobs in fp_sens_only_obs:
-            if str(eandf.get_obsid(eachobs)) not in nopref_list:
-                fp_sense_without_noprefs.append(eachobs)
-
         temp = temps[self.name]
-
-        # ------------------------------------
-        #  CTI-ONLY, -118.7 violation check
-        # ------------------------------------
-        mylog.info('\n\nFP SENSITIVE -118.7 CTI ONLY violations')
-        # Collect any -118.7C violations of CTI runs. These are not
-        # load killers but need to be reported
-
-        viols["cti"] = self.search_obsids_for_viols("CTI", self.fp_sens_limit, 
-                                                    cti_only_obs, temp, times, 
-                                                    load_start)
 
         # ------------------------------------------------------------
         #  FP TEMP sensitive observations; -118.7 violation check
@@ -482,7 +447,7 @@ class ACISFPCheck(ACISThermalCheck):
         mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
 
         viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
-                                                        fp_sense_without_noprefs, 
+                                                        fp_sens_only_obs, 
                                                         temp, times, load_start)
         # --------------------------------------------------------------
         #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
@@ -563,7 +528,8 @@ class ACISFPCheck(ACISThermalCheck):
                            copy=False)
         efov_table['time'].format = '%.2f'
         efov_table['earth_solid_angle'].format = '%.3e'
-        efov_table.write(outfile, format='ascii', delimiter='\t')
+        efov_table.write(outfile, format='ascii', delimiter='\t', overwrite=True)
+
 
 #----------------------------------------------------------------------
 #
@@ -589,7 +555,7 @@ def paint_perigee(perigee_passages, states, plots, msid):
     # Now plot any perigee passages that occur between xmin and xmax
     for eachpassage in perigee_passages:
         # The index [1] item is always the Perigee Passage time. Draw that line in red
-        # If this line is between tstart and tstop then it needs to be drawn 
+        # If this line is between tstart and tstop then it needs to be drawn
         # on the plot. otherwise ignore
         if states['tstop'][-1] >= DateTime(eachpassage[0]).secs >= states['tstart'][0]:
             # Have to convert this time into the new x axis time scale necessitated by SKA
@@ -609,7 +575,6 @@ def paint_perigee(perigee_passages, states, plots, msid):
 
 def draw_obsids(extract_and_filter, 
                 obs_with_sensitivity, 
-                nopref_array,
                 plots,
                 msid, 
                 ypos, 
@@ -619,7 +584,7 @@ def draw_obsids(extract_and_filter,
                 fontsize,
                 plot_start):
     """
-    This functiion draws visual indicators across the top of the plot showing
+    This function draws visual indicators across the top of the plot showing
     which observations are ACIS; whether they are ACIS-I (red) or ACIS-S (green)
     when they start and stop, and whether or not any observation is sensitive to the
     focal plane temperature.  The list of observations sensitive to the focal plane
@@ -631,9 +596,8 @@ def draw_obsids(extract_and_filter,
     The caller supplies:
                Options from the Command line supplied by the user at runtime
                The instance of the ObsidFindFilter() class created 
-               nopref rec array
                The plot dictionary
-               The MSID used to index into the plot dictinary (superfluous but required)
+               The MSID used to index into the plot dictionary (superfluous but required)
                The position on the Y axis you'd like these indicators to appear
                The Y position of the bottom of the end caps
                The Y position of the top of the end caps
@@ -659,17 +623,7 @@ def draw_obsids(extract_and_filter,
         #
         # If the observation is FP sensitive in the first place............
         if eachobservation[extract_and_filter.is_fp_sensitive]:
-            # extract the obsid for convenience
-            this_obsid = extract_and_filter.get_obsid(eachobservation)
-
-            # But if it's also in the nopref list AND the upcased CandS_status entry is "NO PREF"
-            where_words = np.where(nopref_array['obsid'] == str(this_obsid))
-            if str(this_obsid) in nopref_array['obsid'] and \
-               nopref_array['CandS_status'][where_words[0][0]].upper()[:7] == 'NO_PREF':
-                color = 'purple'
-                obsid = obsid + ' * NO PREF *'
-            else:
-                obsid = obsid + ' * FP SENS *'
+            obsid = obsid + ' * FP SENS *'
 
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
@@ -713,65 +667,18 @@ def draw_obsids(extract_and_filter,
                                        fontsize = fontsize)
 
 
-#------------------------------------------------------------------------------
-#
-#   process_nopref_list - read and store the list of observations which
-#                         prefer a Cold and Stable focal plane, but
-#                         which have had that desire waived.
-#
-#                          Input:  nopref file specification
-#                         Output:  nopref_array (numpy array)
-#
-#------------------------------------------------------------------------------
-def process_nopref_list(filespec=default_nopref_list):
-    # Create the dtype for the nopref list rec array
-    nopref_dtype = [('obsid', '|S10'), ('Seq_no', '|S10'), 
-                    ('prop', '|S10'), ('CandS_status', '|S15')]
-
-    # Create an empty nopref array
-    nopref_array = np.array([], dtype=nopref_dtype)
-
-    # Open the nopref list file
-    nopreflist = open(filespec, "r")
-
-    # For each line in the file......
-    for line in nopreflist.readlines():
-
-        # split the line out into it's constituent parts
-        splitline = line.encode().split()
-
-        # If the line is NOT a comment (i.e. does not start with a "#")
-        if splitline[0][0] != '#':
-
-            # Create the row
-            one_entry = np.array(splitline, dtype=nopref_dtype)
-            # Append this row onto the array
-            nopref_array = np.append(nopref_array, one_entry, axis=0)
-
-    # Done with the nopref list file
-    nopreflist.close()
-
-    # Now return the nopref array
-    return nopref_array 
-
-
 def main():
-    opts = [("fps_nopref", {"default": default_nopref_list,
-             "help": "Full path to the FP sensitive nopref file"})]
-    args = get_options("acisfp", model_path, opts=opts)
-    acisfp_check = ACISFPCheck("fptemp", "acisfp", VALIDATION_LIMITS, 
-                               HIST_LIMIT, calc_model, args,
-                               other_telem=['1dahtbon'],
-                               other_map={'1dahtbon': 'dh_heater',
-                                          "fptemp_11": "fptemp"})
+    args = get_options("acisfp", model_path)
+    acisfp_check = ACISFPCheck()
     try:
-        acisfp_check.run()
+        acisfp_check.run(args)
     except Exception as msg:
         if args.traceback:
             raise
         else:
             print("ERROR:", msg)
             sys.exit(1)
+
 
 if __name__ == '__main__':
     main()
