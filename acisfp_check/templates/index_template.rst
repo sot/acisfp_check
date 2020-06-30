@@ -58,21 +58,6 @@ Date start             Date stop              Max temperature     Obsids
 No ACIS-S -111 deg C FP_TEMP Violations
 {% endif %}
 
-
-{% if viols.fp_sens.fptemp %}
-FP TEMP Sensitive, -118.7 deg. C Preference Not Met:
--------------------------------------------------------------------
-=====================  =====================  ==================  ==================
-Date start             Date stop              Max temperature     OBSID
-=====================  =====================  ==================  ==================
-{% for viol in viols.fp_sens.fptemp %}
-{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}             {{viol.obsid}}
-{% endfor %}
-=====================  =====================  ==================  ==================
-{% else %}
-No Focal Plane Sensitive Observation -118.7 deg C FP_TEMP Preferences Unmet
-{% endif %}
-
 .. image:: {{plots.acisfp_3.filename}}
 .. image:: {{plots.pow_sim.filename}}
 .. image:: {{plots.roll_taco.filename}}
