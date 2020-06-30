@@ -54,7 +54,10 @@ class ACISFPCheck(ACISThermalCheck):
                                           other_map={'1dahtbon': 'dh_heater',
                                                      "fptemp_11": "fptemp"})
         # Set specific limits for the focal plane model
-        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
+        self.fp_sens_limit, \
+        self.acis_i_limit, \
+        self.acis_s_limit,\
+        self.acis_hot_limit = \
             get_acis_limits("fptemp")
         self.obs_with_sensitivity = None
         self.perigee_passages = None
@@ -332,7 +335,7 @@ class ACISFPCheck(ACISThermalCheck):
         w1 = None
         # Make plots of FPTEMP and pitch vs time, looping over
         # three different temperature ranges
-        ylim = [(-120, -90), (-120, -119), (-120.0, -109.5)]
+        ylim = [(-120, -90), (-120, -119), (-120.0, -107.5)]
         ypos = [-110.0, -119.35, -116]
         capwidth = [2.0, 0.1, 0.4]
         textypos = [-108.0, -119.3, -115.7]
@@ -345,15 +348,17 @@ class ACISFPCheck(ACISThermalCheck):
                                    title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
-                                   ylim=ylim[i], ylim2=(40, 180),
+                                   ylim=ylim[i], ylim2=(40, 180), 
+                                   figsize=(12, 7.142857142857142),
                                    width=w1, load_start=load_start)
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-            plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
+            plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='dodgerblue', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-            plots[name]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=1.0)
+            plots[name]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-            plots[name]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=1.0)
-
+            plots[name]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=2.0)
+            # Draw a horizontal line showing the ACIS-S -109 deg. C cutoff
+            plots[name]['ax'].axhline(self.acis_hot_limit, linestyle='--', color='red', linewidth=2.0)
             # Get the width of this plot to make the widths of all the
             # prediction plots the same
             if i == 0:
