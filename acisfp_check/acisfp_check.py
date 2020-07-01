@@ -623,13 +623,6 @@ def draw_obsids(extract_and_filter,
         else:
             color = 'green'
 
-        # Add the sensitivity text if the observation was found to be FP TEMP
-        # sensitive
-        #
-        # If the observation is FP sensitive in the first place............
-        if eachobservation[extract_and_filter.is_fp_sensitive]:
-            obsid = obsid + ' * FP SENS *'
-
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
