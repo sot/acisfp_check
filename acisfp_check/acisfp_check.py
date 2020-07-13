@@ -21,7 +21,6 @@ from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
 from Chandra.Time import DateTime, secs2date
 from collections import defaultdict
-import numpy as np
 from acis_thermal_check import \
     ACISThermalCheck, \
     get_options, \
@@ -80,7 +79,7 @@ class ACISFPCheck(ACISThermalCheck):
             to avoid it being used accidentally.
         """
         # Create an empty observation list which will hold the results. This
-        # list contains all ACIS and all CTI observations and will have the
+        # list contains all ACIS and all ECS observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
@@ -149,7 +148,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         # We will get the load passages from the relevant CRM pad time file
         # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
-        # Each line is either an inbound  or outbound CTI
+        # Each line is either an inbound or outbound ECS
         #
         # The reason we are doing this is because we want to draw vertical
         # lines denoting each perigee passage on the plots
@@ -268,16 +267,16 @@ class ACISFPCheck(ACISThermalCheck):
         # methods to extract obsid intervals from the commanded states based 
         # upon ACIS definitions and considerations. It also provides
         # various methods to filter the interval set based upon pitch range, 
-        # number of ccd's, filter out CTI observations, and a range of exposure 
+        # number of ccd's, filter out ECS observations, and a range of exposure 
         # times.
         extract_and_filter = ObsidFindFilter()
 
         # extract the OBSID's from the commanded states. NOTE: this contains all
-        # observations including CTI runs and HRC observations
+        # observations including ECS runs and HRC observations
         observation_intervals = extract_and_filter.find_obsid_intervals(states, None)
 
-        # Filter out any HRC science observations BUT keep ACIS CTI observations
-        acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
+        # Filter out any HRC science observations BUT keep ACIS ECS observations
+        acis_and_ecs_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
 
         # Ok so now you have all the ACIS observations collected. Also,
         # they have been identified by ObsidFindFilter as to who is in the focal plane.
@@ -309,7 +308,7 @@ class ACISFPCheck(ACISThermalCheck):
         # "NOT FP SENS" to the end of each observation.
 
         # Now run through the observation list attribute of the ObsidFindFilter class
-        for eachobservation in acis_and_cti_obs:
+        for eachobservation in acis_and_ecs_obs:
             # Pull the obsid from the observation and turn it into a string
 
             obsid = str(extract_and_filter.get_obsid(eachobservation))
@@ -394,12 +393,12 @@ class ACISFPCheck(ACISThermalCheck):
 
         MSID is a global
 
-        obs_with_sensitivity contains all ACIS and CTI observations
+        obs_with_sensitivity contains all ACIS and ECS observations
         and they have had FP sensitivity boolean added. In other words it's
         All ACIS and ECS runs.
 
-        We will create a list of CTI-ONLY runs, and a list of all
-        ACIS science runs without CTI runs. These two lists will
+        We will create a list of ECS-ONLY runs, and a list of all
+        ACIS science runs without ECS runs. These two lists will
         be used to assess the categories of violations:
 
             1) Any ACIS-I observation that violates the -114 red limit
@@ -409,14 +408,6 @@ class ACISFPCheck(ACISThermalCheck):
             2) Any ACIS-S observation that violates the -112 red limit
                is a violation and a load killer
                  - science_viols
-
-            3) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7
-               results in a "Preferences Not Met" indicator.
-                 - fp_sense_viols
-
-            3) Any CTI run that violates the -114 RED limit needs to be
-               tracked and is NOT a load killer
-                 - cti_viols
 
         """
         times = self.predict_model.times
@@ -437,11 +428,11 @@ class ACISFPCheck(ACISThermalCheck):
         ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
         ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
 
-        # ACIS SCIENCE observations only  - no HRC; no CTI
-        non_cti_obs = eandf.cti_filter(self.obs_with_sensitivity)
+        # ACIS SCIENCE observations only  - no HRC; no ECS
+        non_ecs_obs = eandf.ecs_filter(self.obs_with_sensitivity)
 
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
-        fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
+        fp_sens_only_obs = eandf.fp_sens_filter(non_ecs_obs)
 
         temp = temps[self.name]
 
@@ -455,7 +446,7 @@ class ACISFPCheck(ACISThermalCheck):
                                                         fp_sens_only_obs, 
                                                         temp, times, load_start)
         # --------------------------------------------------------------
-        #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
+        #  ACIS-S - Collect any -112C violations of any non-ECS ACIS-S science run.
         #  These are load killers
         # --------------------------------------------------------------
         #
@@ -465,7 +456,7 @@ class ACISFPCheck(ACISThermalCheck):
                                                        ACIS_S_obs, temp, times, load_start)
 
         # --------------------------------------------------------------
-        #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run.
+        #  ACIS-I - Collect any -114C violations of any non-ECS ACIS science run.
         #  These are load killers
         # --------------------------------------------------------------
         #
@@ -596,7 +587,7 @@ def draw_obsids(extract_and_filter,
     is found by reading the fp_sensitive.dat file that is located in each LR
     directory and is created by the LR script.
 
-    No CTI measurements are indicated - only science runs.
+    No ECS measurements are indicated - only science runs.
 
     The caller supplies:
                Options from the Command line supplied by the user at runtime
