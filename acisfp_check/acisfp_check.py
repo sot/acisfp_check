@@ -344,7 +344,7 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
                                    x2=self.predict_model.times,
                                    y2=self.predict_model.comp["pitch"].mvals,
-                                   title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   title=f"{self.msid.upper()} (ACIS-I in red; ACIS-S in green; ECS in blue)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
                                    ylim=ylim[i], ylim2=(40, 180), 
@@ -581,13 +581,11 @@ def draw_obsids(extract_and_filter,
                 plot_start):
     """
     This function draws visual indicators across the top of the plot showing
-    which observations are ACIS; whether they are ACIS-I (red) or ACIS-S (green)
-    when they start and stop, and whether or not any observation is sensitive to the
-    focal plane temperature.  The list of observations sensitive to the focal plane
-    is found by reading the fp_sensitive.dat file that is located in each LR
-    directory and is created by the LR script.
-
-    No ECS measurements are indicated - only science runs.
+    which observations are ACIS; whether they are ACIS-I (red), ACIS-S (green),
+    or ECS (blue); when they start and stop; and whether or not any observation 
+    is sensitive to the focal plane temperature. The list of observations sensitive 
+    to the focal plane is found by reading the fp_sensitive.dat file that is 
+    located in each LR directory and is created by the LR script.
 
     The caller supplies:
                Options from the Command line supplied by the user at runtime
@@ -605,20 +603,25 @@ def draw_obsids(extract_and_filter,
     for eachobservation in obs_with_sensitivity:
         # extract the obsid
 
-        obsid = str(extract_and_filter.get_obsid(eachobservation))
+        obsid = extract_and_filter.get_obsid(eachobservation)
+        in_fp = eachobservation[extract_and_filter.in_focal_plane]
 
-        # Color all ACIS-S observations green; all ACIS-I 
-        # observations red
-        if eachobservation[extract_and_filter.in_focal_plane] == "ACIS-I":
-            color = 'red'
+        if obsid > 50000:
+            # ECS observations during the science orbit are colored blue
+            color = 'blue'
         else:
-            color = 'green'
+            # Color all ACIS-S observations green; all ACIS-I
+            # observations red
+            if in_fp == "ACIS-I":
+                color = 'red'
+            else:
+                color = 'green'
 
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
-        if eachobservation[extract_and_filter.in_focal_plane].startswith("ACIS-"):
+        if in_fp.startswith("ACIS-") or obsid > 50000:
             # For each ACIS Obsid, draw a horizontal line to show 
             # its start and stop
             plots[msid]['ax'].hlines(ypos, 
@@ -649,11 +652,11 @@ def draw_obsids(extract_and_filter,
                 plots[msid]['ax'].text(obs_time, 
                                        textypos, 
                                        obsid,  
-                                       color = color, 
+                                       color=color, 
                                        va='bottom', 
                                        ma='left', 
-                                       rotation = 90, 
-                                       fontsize = fontsize)
+                                       rotation=90, 
+                                       fontsize=fontsize)
 
 
 def main():
