@@ -46,7 +46,7 @@ class ACISFPCheck(ACISThermalCheck):
         valid_limits = {'PITCH': [(1, 3.0), (99, 3.0)],
                         'TSCPOS': [(1, 2.5), (99, 2.5)]
                         }
-        hist_limit = [(-120.0, -112.0)]
+        hist_limit = [(-120.0, -109.0)]
         super(ACISFPCheck, self).__init__("fptemp", "acisfp", valid_limits,
                                           hist_limit,
                                           other_telem=['1dahtbon'],
