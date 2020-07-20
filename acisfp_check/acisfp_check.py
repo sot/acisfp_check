@@ -370,8 +370,9 @@ class ACISFPCheck(ACISThermalCheck):
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
             draw_obsids(extract_and_filter, self.obs_with_sensitivity, 
-                        plots, name, ypos[i], ypos[i]-0.5*capwidth[i], ypos[i]+0.5*capwidth[i],
-                        textypos[i], fontsize[i], plot_start)
+                        plots, name, ypos[i], ypos[i]-0.5*capwidth[i], 
+                        ypos[i]+0.5*capwidth[i], textypos[i], 
+                        fontsize[i], plot_start)
 
             # Build the file name and output the plot to a file
             filename = self.msid.lower() + 'M%dtoM%d.png' % (-ylim[i][0], -ylim[i][1])
@@ -425,46 +426,49 @@ class ACISFPCheck(ACISThermalCheck):
         #   Create subsets of all the observations
         # ------------------------------------------------------
         # Now divide out observations by ACIS-S and ACIS-I
-        ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
-        ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
+        ACIS_S_obs = eandf.get_all_specific_instrument(
+            self.obs_with_sensitivity, "ACIS-S")
+        ACIS_I_obs = eandf.get_all_specific_instrument(
+            self.obs_with_sensitivity, "ACIS-I")
 
         # ACIS SCIENCE observations only  - no HRC; no ECS
-        non_ecs_obs = eandf.ecs_filter(self.obs_with_sensitivity)
+        #non_ecs_obs = eandf.ecs_filter(self.obs_with_sensitivity)
+
+        sci_ecs_obs = eandf.ecs_only_filter(self.obs_with_sensitivity)
 
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
-        fp_sens_only_obs = eandf.fp_sens_filter(non_ecs_obs)
+        #fp_sens_only_obs = eandf.fp_sens_filter(non_ecs_obs)
 
         temp = temps[self.name]
 
         # ------------------------------------------------------------
-        #  FP TEMP sensitive observations; -118.7 violation check
-        #     These are not load killers
+        # Science Orbit ECS -119.5 violations; -119.5 violation check
         # ------------------------------------------------------------
-        mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
+        mylog.info('\n\nFP SENSITIVE -119.5 SCIENCE ONLY violations')
 
-        viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
-                                                        fp_sens_only_obs, 
-                                                        temp, times, load_start)
-        # --------------------------------------------------------------
-        #  ACIS-S - Collect any -112C violations of any non-ECS ACIS-S science run.
-        #  These are load killers
-        # --------------------------------------------------------------
+        viols["ecs"] = self.search_obsids_for_viols("Science Orbit ECS",
+            self.fp_sens_limit, sci_ecs_obs, temp, times, load_start)
+
+        # ------------------------------------------------------------
+        # ACIS-S - Collect any -111 C violations of any non-ECS ACIS-S
+        # science run. These are load killers
+        # ------------------------------------------------------------
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S", self.acis_s_limit, 
-                                                       ACIS_S_obs, temp, times, load_start)
+        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S",
+            self.acis_s_limit, ACIS_S_obs, temp, times, load_start)
 
-        # --------------------------------------------------------------
-        #  ACIS-I - Collect any -114C violations of any non-ECS ACIS science run.
-        #  These are load killers
-        # --------------------------------------------------------------
+        # ------------------------------------------------------------
+        # ACIS-I - Collect any -112 C violations of any non-ECS ACIS-I
+        # science run. These are load killers
+        # ------------------------------------------------------------
         #
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I", self.acis_i_limit, 
-                                                       ACIS_I_obs, temp, times, load_start)
+        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I",
+            self.acis_i_limit, ACIS_I_obs, temp, times, load_start)
 
         return viols
 
@@ -608,7 +612,7 @@ def draw_obsids(extract_and_filter,
 
         if obsid > 50000:
             # ECS observations during the science orbit are colored blue
-            color = 'blue'
+            color = 'royalblue'
         else:
             # Color all ACIS-S observations green; all ACIS-I
             # observations red
@@ -617,12 +621,18 @@ def draw_obsids(extract_and_filter,
             else:
                 color = 'green'
 
+        obsid_txt = str(obsid)
+        # If this is an ECS measurement in the science orbit mark
+        # it as such
+        if obsid > 50000:
+            obsid_txt += " (ECS)"
+
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
         if in_fp.startswith("ACIS-") or obsid > 50000:
-            # For each ACIS Obsid, draw a horizontal line to show 
+            # For each ACIS Obsid, draw a horizontal line to show
             # its start and stop
             plots[msid]['ax'].hlines(ypos, 
                                      obs_start, 
@@ -651,7 +661,7 @@ def draw_obsids(extract_and_filter,
                 # Now plot the obsid.
                 plots[msid]['ax'].text(obs_time, 
                                        textypos, 
-                                       obsid,  
+                                       obsid_txt,  
                                        color=color, 
                                        va='bottom', 
                                        ma='left', 

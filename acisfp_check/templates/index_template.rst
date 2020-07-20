@@ -58,6 +58,20 @@ Date start             Date stop              Max temperature     Obsids
 No ACIS-S -111 deg C FP_TEMP Violations
 {% endif %}
 
+{% if viols.ecs.fptemp %}
+Science Orbit ECS -119.5 deg C Violations
+-----------------------------------------
+=====================  =====================  ==================  ==================
+Date start             Date stop              Max temperature     OBSID
+=====================  =====================  ==================  ==================
+{% for viol in viols.ecs.fptemp %}
+{{viol.datestart}}  {{viol.datestop}}  {{"%.2f"|format(viol.maxtemp)}}             {{viol.obsid}}
+{% endfor %}
+=====================  =====================  ==================  ==================
+{% else %}
+No Science Orbit ECS -119.5 deg C FP_TEMP Violations
+{% endif %}
+
 .. image:: {{plots.acisfp_3.filename}}
 .. image:: {{plots.pow_sim.filename}}
 .. image:: {{plots.roll_taco.filename}}
