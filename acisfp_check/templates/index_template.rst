@@ -135,9 +135,6 @@ Earth Solid Angle
 {{ plot.msid }}
 -----------------------
 
-
-Red = telemetry, blue = model
-
 .. image:: {{plot.lines}}
 
 Data for FPTEMP residual plots limited between -120.0 and -112.0 deg. C
