@@ -444,7 +444,7 @@ class ACISFPCheck(ACISThermalCheck):
         # ------------------------------------------------------------
         # Science Orbit ECS -119.5 violations; -119.5 violation check
         # ------------------------------------------------------------
-        mylog.info('\n\nFP SENSITIVE -119.5 SCIENCE ONLY violations')
+        mylog.info('\n\nFP SENSITIVE -119.5 SCIENCE ORBIT ECS violations')
 
         viols["ecs"] = self.search_obsids_for_viols("Science Orbit ECS",
             self.fp_sens_limit, sci_ecs_obs, temp, times, load_start)
@@ -612,7 +612,7 @@ def draw_obsids(extract_and_filter,
 
         if obsid > 50000:
             # ECS observations during the science orbit are colored blue
-            color = 'royalblue'
+            color = 'blue'
         else:
             # Color all ACIS-S observations green; all ACIS-I
             # observations red
