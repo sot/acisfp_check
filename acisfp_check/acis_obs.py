@@ -471,7 +471,7 @@ class ObsidFindFilter():
         # check the SIMODE of the interval. If it is 50k or greater, it's
         # an ECS observation and we want to remove those from our list
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.obsid] < 50000:
+            if eachinterval[self.obsid] < 60000:
                 self.non_ECS_obs.append(eachinterval)
 
         return self.non_ECS_obs
@@ -610,7 +610,7 @@ class ObsidFindFilter():
         """
         ecs_only = []
         for eachobservation in obsidinterval_list:
-            if eachobservation[self.obsid] >= 50000 and \
+            if eachobservation[self.obsid] >= 60000 and \
                eachobservation[self.in_focal_plane] == "HRC-S":
                 ecs_only.append(eachobservation)
         return ecs_only

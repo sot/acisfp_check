@@ -610,7 +610,7 @@ def draw_obsids(extract_and_filter,
         obsid = extract_and_filter.get_obsid(eachobservation)
         in_fp = eachobservation[extract_and_filter.in_focal_plane]
 
-        if obsid > 50000:
+        if obsid > 60000:
             # ECS observations during the science orbit are colored blue
             color = 'blue'
         else:
@@ -624,14 +624,14 @@ def draw_obsids(extract_and_filter,
         obsid_txt = str(obsid)
         # If this is an ECS measurement in the science orbit mark
         # it as such
-        if obsid > 50000:
+        if obsid > 60000:
             obsid_txt += " (ECS)"
 
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
-        if in_fp.startswith("ACIS-") or obsid > 50000:
+        if in_fp.startswith("ACIS-") or obsid > 60000:
             # For each ACIS Obsid, draw a horizontal line to show
             # its start and stop
             plots[msid]['ax'].hlines(ypos, 
