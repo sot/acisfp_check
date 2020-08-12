@@ -7,7 +7,7 @@
 #
 #                        These filters are: Exposure time range
 #                                           CCD Count range
-#                                           CTI observation removal
+#                                           ECS observation removal
 #                                           Pitch range
 #
 #
@@ -101,7 +101,7 @@ class ObsidFindFilter():
         # But that may change in the future.
         self.cmd_states = None
         self.obsid_interval_list = None
-        self.non_CTI_obs = None
+        self.non_ECS_obs = None
 
         self.list_of_sensitive_obs = []
 
@@ -440,13 +440,13 @@ class ObsidFindFilter():
 
     #---------------------------------------------------------------------
     #
-    #   CTI_filter
+    #   ECS_filter
     #
     #---------------------------------------------------------------------
-    def cti_filter(self, obsidinterval_list):
+    def ecs_filter(self, obsidinterval_list):
         """
         Given a list of obsid intervals, remove any obsid
-                     interval which is a CTI observation (i.e. has 
+                     interval which is an ECS observation (i.e. has 
                      an OBSID greater than 50k).
                    - return the filtered list
                      specified and return those intervals as a list.
@@ -465,19 +465,16 @@ class ObsidFindFilter():
                        filespec = <some file path> or " "
                        cmd_states = cmd_statesFetch(start_time, stop_time)
                        obsid_intervals = FindObsidIntervals(cmd_states, filespec)
-
-                       Non_cti_intervals = CTIFilter(OBSIDIntervals)
-
         """
-        self.non_CTI_obs = []
+        self.non_ECS_obs = []
 
-        # check the OBSID of the interval. If it is 50k or greater, it's
-        # a CTI observation and we want to remove those from our list
+        # check the SIMODE of the interval. If it is 50k or greater, it's
+        # an ECS observation and we want to remove those from our list
         for eachinterval in obsidinterval_list:
-            if eachinterval[self.obsid] < 50000:
-                self.non_CTI_obs.append(eachinterval)
+            if eachinterval[self.obsid] < 60000:
+                self.non_ECS_obs.append(eachinterval)
 
-        return self.non_CTI_obs
+        return self.non_ECS_obs
  
     #---------------------------------------------------------------------
     #
@@ -592,31 +589,31 @@ class ObsidFindFilter():
         HRC-I" or HRC-S" as the science instrument, AND an obsid LESS THAN 
         50,000
         """
-        acis_and_cti_only = []
+        acis_and_ecs_only = []
         for eachobservation in obsidinterval_list:
             if eachobservation[self.in_focal_plane].startswith("ACIS-") or \
                eachobservation[self.obsid] >= 50000:
-                acis_and_cti_only.append(eachobservation)
-        return acis_and_cti_only
+                acis_and_ecs_only.append(eachobservation)
+        return acis_and_ecs_only
 
 
     #--------------------------------------------------------------------------
     #
-    #   cti_only_filter
+    #   ecs_only_filter
     #
     #--------------------------------------------------------------------------
-    def cti_only_filter(self, obsidinterval_list):
+    def ecs_only_filter(self, obsidinterval_list):
         """
         This method will filter out any science observation from the 
         input obsid interval list.It keeps any observation that has an
         obsid of 50,000 or greater
         """
-        cti_only = []
+        ecs_only = []
         for eachobservation in obsidinterval_list:
-            if eachobservation[self.obsid] >= 50000 and \
+            if eachobservation[self.obsid] >= 60000 and \
                eachobservation[self.in_focal_plane] == "HRC-S":
-                cti_only.append(eachobservation)
-        return cti_only
+                ecs_only.append(eachobservation)
+        return ecs_only
 
 
     #--------------------------------------------------------------------------
@@ -645,11 +642,11 @@ class ObsidFindFilter():
     #
     #---------------------------------------------------------------------
     def general_g_i(self, start_time='2011:001', stop_time=None, 
-                    exptime=None, noCTI=False, pitchrange=None): 
+                    exptime=None, noECS=False, pitchrange=None): 
         """
         Given: A Start and Stop time
                Exposure time range (e.g. [10000, 50000])
-               CTI include flag (True/False)
+               ECS include flag (True/False)
                Pitch range [low, high]
  
         Return:  Get all the obsid intervals between start_time
@@ -685,23 +682,23 @@ class ObsidFindFilter():
             print("general_g_i Step 3 - No exposure time filtering")
         print("Number of Observation Intervals found within the time filter: ", len(ei))
 
-        # Step 4 - Filter out all CTI observations if required
-        if noCTI == True:
-            print("\ngeneral_g_i Step 4 - Filter out all CTI observations")
-            no_cti = self.cti_filter(ei)
+        # Step 4 - Filter out all ECS observations if required
+        if noECS:
+            print("\ngeneral_g_i Step 4 - Filter out all ECS observations")
+            no_ecs = self.ecs_filter(ei)
         else:
-            print("\ngeneral_g_i Step 4 - *SKIPPED* Filter out all CTI "
+            print("\ngeneral_g_i Step 4 - *SKIPPED* Filter out all ECS "
                   "observations - SKIPPED")
-            no_cti = ei
-        print("Number of observations after CTI's processing (or not) is: ", len(no_cti))
+            no_ecs = ei
+        print("Number of observations after ECS's processing (or not) is: ", len(no_ecs))
 
         # Step 5 - Filter based upon pitch if a pitch range is given
         if pitchrange != []:
             print("\ngeneral_g_i Step 5 - Filtering on pitches in the range: ", pitchrange)
-            pitchlist = self.pitch_filter(no_cti, pitchrange)
+            pitchlist = self.pitch_filter(no_ecs, pitchrange)
         else:
             print("\ngeneral_g_i Step 5 - NO Filtering on pitches")
-            pitchlist = no_cti
+            pitchlist = no_ecs
 
         print("\n\ngeneral_g_i -----Final number of obsid's filtered is: ", len(pitchlist))
 

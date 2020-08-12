@@ -21,7 +21,6 @@ from Ska.Matplotlib import pointpair, \
     cxctime2plotdate
 from Chandra.Time import DateTime, secs2date
 from collections import defaultdict
-import numpy as np
 from acis_thermal_check import \
     ACISThermalCheck, \
     get_options, \
@@ -47,14 +46,17 @@ class ACISFPCheck(ACISThermalCheck):
         valid_limits = {'PITCH': [(1, 3.0), (99, 3.0)],
                         'TSCPOS': [(1, 2.5), (99, 2.5)]
                         }
-        hist_limit = [(-120.0, -112.0)]
+        hist_limit = [(-120.0, -109.0)]
         super(ACISFPCheck, self).__init__("fptemp", "acisfp", valid_limits,
                                           hist_limit,
                                           other_telem=['1dahtbon'],
                                           other_map={'1dahtbon': 'dh_heater',
                                                      "fptemp_11": "fptemp"})
         # Set specific limits for the focal plane model
-        self.fp_sens_limit, self.acis_i_limit, self.acis_s_limit = \
+        self.fp_sens_limit, \
+        self.acis_i_limit, \
+        self.acis_s_limit,\
+        self.acis_hot_limit = \
             get_acis_limits("fptemp")
         self.obs_with_sensitivity = None
         self.perigee_passages = None
@@ -77,7 +79,7 @@ class ACISFPCheck(ACISThermalCheck):
             to avoid it being used accidentally.
         """
         # Create an empty observation list which will hold the results. This
-        # list contains all ACIS and all CTI observations and will have the
+        # list contains all ACIS and all ECS observations and will have the
         # sensitivity boolean added.
         self.obs_with_sensitivity = []
         self.perigee_passages = []
@@ -146,7 +148,7 @@ class ACISFPCheck(ACISThermalCheck):
 
         # We will get the load passages from the relevant CRM pad time file
         # (e.g. DO12143_CRM_Pad.txt) inside the bsdir directory
-        # Each line is either an inbound  or outbound CTI
+        # Each line is either an inbound or outbound ECS
         #
         # The reason we are doing this is because we want to draw vertical
         # lines denoting each perigee passage on the plots
@@ -265,16 +267,16 @@ class ACISFPCheck(ACISThermalCheck):
         # methods to extract obsid intervals from the commanded states based 
         # upon ACIS definitions and considerations. It also provides
         # various methods to filter the interval set based upon pitch range, 
-        # number of ccd's, filter out CTI observations, and a range of exposure 
+        # number of ccd's, filter out ECS observations, and a range of exposure 
         # times.
         extract_and_filter = ObsidFindFilter()
 
         # extract the OBSID's from the commanded states. NOTE: this contains all
-        # observations including CTI runs and HRC observations
+        # observations including ECS runs and HRC observations
         observation_intervals = extract_and_filter.find_obsid_intervals(states, None)
 
-        # Filter out any HRC science observations BUT keep ACIS CTI observations
-        acis_and_cti_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
+        # Filter out any HRC science observations BUT keep ACIS ECS observations
+        acis_and_ecs_obs = extract_and_filter.hrc_science_obs_filter(observation_intervals)
 
         # Ok so now you have all the ACIS observations collected. Also,
         # they have been identified by ObsidFindFilter as to who is in the focal plane.
@@ -306,7 +308,7 @@ class ACISFPCheck(ACISThermalCheck):
         # "NOT FP SENS" to the end of each observation.
 
         # Now run through the observation list attribute of the ObsidFindFilter class
-        for eachobservation in acis_and_cti_obs:
+        for eachobservation in acis_and_ecs_obs:
             # Pull the obsid from the observation and turn it into a string
 
             obsid = str(extract_and_filter.get_obsid(eachobservation))
@@ -332,7 +334,7 @@ class ACISFPCheck(ACISThermalCheck):
         w1 = None
         # Make plots of FPTEMP and pitch vs time, looping over
         # three different temperature ranges
-        ylim = [(-120, -90), (-120, -119), (-120.0, -109.5)]
+        ylim = [(-120, -90), (-120, -119), (-120.0, -107.5)]
         ypos = [-110.0, -119.35, -116]
         capwidth = [2.0, 0.1, 0.4]
         textypos = [-108.0, -119.3, -115.7]
@@ -342,18 +344,20 @@ class ACISFPCheck(ACISThermalCheck):
             plots[name] = plot_two(fig_id=i+1, x=times, y=temps[self.name],
                                    x2=self.predict_model.times,
                                    y2=self.predict_model.comp["pitch"].mvals,
-                                   title=self.msid.upper() + " (ACIS-I obs. in red; ACIS-S in green)",
+                                   title=f"{self.msid.upper()} (ACIS-I in red; ACIS-S in green; ECS in blue)",
                                    xlabel='Date', ylabel='Temperature (C)',
                                    ylabel2='Pitch (deg)', xmin=plot_start,
-                                   ylim=ylim[i], ylim2=(40, 180),
+                                   ylim=ylim[i], ylim2=(40, 180), 
+                                   figsize=(12, 7.142857142857142),
                                    width=w1, load_start=load_start)
             # Draw a horizontal line indicating the FP Sensitive Observation Cut off
-            plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='red', linewidth=2.0)
+            plots[name]['ax'].axhline(self.fp_sens_limit, linestyle='--', color='dodgerblue', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-I -114 deg. C cutoff
-            plots[name]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=1.0)
+            plots[name]['ax'].axhline(self.acis_i_limit, linestyle='--', color='purple', linewidth=2.0)
             # Draw a horizontal line showing the ACIS-S -112 deg. C cutoff
-            plots[name]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=1.0)
-
+            plots[name]['ax'].axhline(self.acis_s_limit, linestyle='--', color='blue', linewidth=2.0)
+            # Draw a horizontal line showing the ACIS-S -109 deg. C cutoff
+            plots[name]['ax'].axhline(self.acis_hot_limit, linestyle='--', color='red', linewidth=2.0)
             # Get the width of this plot to make the widths of all the
             # prediction plots the same
             if i == 0:
@@ -366,8 +370,9 @@ class ACISFPCheck(ACISThermalCheck):
             # Now draw horizontal lines on the plot running from start to stop
             # and label them with the Obsid
             draw_obsids(extract_and_filter, self.obs_with_sensitivity, 
-                        plots, name, ypos[i], ypos[i]-0.5*capwidth[i], ypos[i]+0.5*capwidth[i],
-                        textypos[i], fontsize[i], plot_start)
+                        plots, name, ypos[i], ypos[i]-0.5*capwidth[i], 
+                        ypos[i]+0.5*capwidth[i], textypos[i], 
+                        fontsize[i], plot_start)
 
             # Build the file name and output the plot to a file
             filename = self.msid.lower() + 'M%dtoM%d.png' % (-ylim[i][0], -ylim[i][1])
@@ -389,12 +394,12 @@ class ACISFPCheck(ACISThermalCheck):
 
         MSID is a global
 
-        obs_with_sensitivity contains all ACIS and CTI observations
+        obs_with_sensitivity contains all ACIS and ECS observations
         and they have had FP sensitivity boolean added. In other words it's
         All ACIS and ECS runs.
 
-        We will create a list of CTI-ONLY runs, and a list of all
-        ACIS science runs without CTI runs. These two lists will
+        We will create a list of ECS-ONLY runs, and a list of all
+        ACIS science runs without ECS runs. These two lists will
         be used to assess the categories of violations:
 
             1) Any ACIS-I observation that violates the -114 red limit
@@ -404,14 +409,6 @@ class ACISFPCheck(ACISThermalCheck):
             2) Any ACIS-S observation that violates the -112 red limit
                is a violation and a load killer
                  - science_viols
-
-            3) Any ACIS FP TEMP sensitive obs that gets warmer than -118.7
-               results in a "Preferences Not Met" indicator.
-                 - fp_sense_viols
-
-            3) Any CTI run that violates the -114 RED limit needs to be
-               tracked and is NOT a load killer
-                 - cti_viols
 
         """
         times = self.predict_model.times
@@ -429,46 +426,49 @@ class ACISFPCheck(ACISThermalCheck):
         #   Create subsets of all the observations
         # ------------------------------------------------------
         # Now divide out observations by ACIS-S and ACIS-I
-        ACIS_S_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-S")
-        ACIS_I_obs = eandf.get_all_specific_instrument(self.obs_with_sensitivity, "ACIS-I")
+        ACIS_S_obs = eandf.get_all_specific_instrument(
+            self.obs_with_sensitivity, "ACIS-S")
+        ACIS_I_obs = eandf.get_all_specific_instrument(
+            self.obs_with_sensitivity, "ACIS-I")
 
-        # ACIS SCIENCE observations only  - no HRC; no CTI
-        non_cti_obs = eandf.cti_filter(self.obs_with_sensitivity)
+        # ACIS SCIENCE observations only  - no HRC; no ECS
+        #non_ecs_obs = eandf.ecs_filter(self.obs_with_sensitivity)
+
+        sci_ecs_obs = eandf.ecs_only_filter(self.obs_with_sensitivity)
 
         # ACIS SCIENCE OBS which are sensitive to FP TEMP
-        fp_sens_only_obs = eandf.fp_sens_filter(non_cti_obs)
+        #fp_sens_only_obs = eandf.fp_sens_filter(non_ecs_obs)
 
         temp = temps[self.name]
 
         # ------------------------------------------------------------
-        #  FP TEMP sensitive observations; -118.7 violation check
-        #     These are not load killers
+        # Science Orbit ECS -119.5 violations; -119.5 violation check
         # ------------------------------------------------------------
-        mylog.info('\n\nFP SENSITIVE -118.7 SCIENCE ONLY violations')
+        mylog.info('\n\nFP SENSITIVE -119.5 SCIENCE ORBIT ECS violations')
 
-        viols["fp_sens"] = self.search_obsids_for_viols("FP-sensitive", self.fp_sens_limit,
-                                                        fp_sens_only_obs, 
-                                                        temp, times, load_start)
-        # --------------------------------------------------------------
-        #  ACIS-S - Collect any -112C violations of any non-CTI ACIS-S science run.
-        #  These are load killers
-        # --------------------------------------------------------------
+        viols["ecs"] = self.search_obsids_for_viols("Science Orbit ECS",
+            self.fp_sens_limit, sci_ecs_obs, temp, times, load_start)
+
+        # ------------------------------------------------------------
+        # ACIS-S - Collect any -111 C violations of any non-ECS ACIS-S
+        # science run. These are load killers
+        # ------------------------------------------------------------
         #
         mylog.info('\n\n ACIS-S -112 SCIENCE ONLY violations')
 
-        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S", self.acis_s_limit, 
-                                                       ACIS_S_obs, temp, times, load_start)
+        viols["ACIS_S"] = self.search_obsids_for_viols("ACIS-S",
+            self.acis_s_limit, ACIS_S_obs, temp, times, load_start)
 
-        # --------------------------------------------------------------
-        #  ACIS-I - Collect any -114C violations of any non-CTI ACIS science run.
-        #  These are load killers
-        # --------------------------------------------------------------
+        # ------------------------------------------------------------
+        # ACIS-I - Collect any -112 C violations of any non-ECS ACIS-I
+        # science run. These are load killers
+        # ------------------------------------------------------------
         #
         mylog.info('\n\n ACIS-I -114 SCIENCE ONLY violations')
 
         # Create the violation data structure.
-        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I", self.acis_i_limit, 
-                                                       ACIS_I_obs, temp, times, load_start)
+        viols["ACIS_I"] = self.search_obsids_for_viols("ACIS-I",
+            self.acis_i_limit, ACIS_I_obs, temp, times, load_start)
 
         return viols
 
@@ -585,13 +585,11 @@ def draw_obsids(extract_and_filter,
                 plot_start):
     """
     This function draws visual indicators across the top of the plot showing
-    which observations are ACIS; whether they are ACIS-I (red) or ACIS-S (green)
-    when they start and stop, and whether or not any observation is sensitive to the
-    focal plane temperature.  The list of observations sensitive to the focal plane
-    is found by reading the fp_sensitive.dat file that is located in each LR
-    directory and is created by the LR script.
-
-    No CTI measurements are indicated - only science runs.
+    which observations are ACIS; whether they are ACIS-I (red), ACIS-S (green),
+    or ECS (blue); when they start and stop; and whether or not any observation 
+    is sensitive to the focal plane temperature. The list of observations sensitive 
+    to the focal plane is found by reading the fp_sensitive.dat file that is 
+    located in each LR directory and is created by the LR script.
 
     The caller supplies:
                Options from the Command line supplied by the user at runtime
@@ -609,28 +607,32 @@ def draw_obsids(extract_and_filter,
     for eachobservation in obs_with_sensitivity:
         # extract the obsid
 
-        obsid = str(extract_and_filter.get_obsid(eachobservation))
+        obsid = extract_and_filter.get_obsid(eachobservation)
+        in_fp = eachobservation[extract_and_filter.in_focal_plane]
 
-        # Color all ACIS-S observations green; all ACIS-I 
-        # observations red
-        if eachobservation[extract_and_filter.in_focal_plane] == "ACIS-I":
-            color = 'red'
+        if obsid > 60000:
+            # ECS observations during the science orbit are colored blue
+            color = 'blue'
         else:
-            color = 'green'
+            # Color all ACIS-S observations green; all ACIS-I
+            # observations red
+            if in_fp == "ACIS-I":
+                color = 'red'
+            else:
+                color = 'green'
 
-        # Add the sensitivity text if the observation was found to be FP TEMP
-        # sensitive
-        #
-        # If the observation is FP sensitive in the first place............
-        if eachobservation[extract_and_filter.is_fp_sensitive]:
-            obsid = obsid + ' * FP SENS *'
+        obsid_txt = str(obsid)
+        # If this is an ECS measurement in the science orbit mark
+        # it as such
+        if obsid > 60000:
+            obsid_txt += " (ECS)"
 
         # Convert the start and stop times into the Ska-required format
         obs_start = cxctime2plotdate([extract_and_filter.get_tstart(eachobservation)])
         obs_stop = cxctime2plotdate([extract_and_filter.get_tstop(eachobservation)])
 
-        if eachobservation[extract_and_filter.in_focal_plane].startswith("ACIS-"):
-            # For each ACIS Obsid, draw a horizontal line to show 
+        if in_fp.startswith("ACIS-") or obsid > 60000:
+            # For each ACIS Obsid, draw a horizontal line to show
             # its start and stop
             plots[msid]['ax'].hlines(ypos, 
                                      obs_start, 
@@ -659,12 +661,12 @@ def draw_obsids(extract_and_filter,
                 # Now plot the obsid.
                 plots[msid]['ax'].text(obs_time, 
                                        textypos, 
-                                       obsid,  
-                                       color = color, 
+                                       obsid_txt,  
+                                       color=color, 
                                        va='bottom', 
                                        ma='left', 
-                                       rotation = 90, 
-                                       fontsize = fontsize)
+                                       rotation=90, 
+                                       fontsize=fontsize)
 
 
 def main():
